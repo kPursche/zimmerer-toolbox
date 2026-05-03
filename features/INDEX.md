@@ -21,3 +21,9 @@
 | PROJ-7 | PWA-Support (Offline, Installierbar) | Planned | [PROJ-7-pwa.md](PROJ-7-pwa.md) | 2026-05-02 |
 
 ## Next Available ID: PROJ-8
+
+## Deployment
+
+- **Production URL:** https://zimmerer-toolbox.vercel.app
+- **Deployed:** 2026-05-03
+- **Hosting:** Vercel (Auto-Deploy via GitHub `main`)
