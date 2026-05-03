@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TOOLS, getToolBySlug } from "@/lib/tools";
+import { GauenwangenTool } from "@/components/tools/gauenwangen";
 
 interface ToolPageProps {
   params: Promise<{ slug: string }>;
@@ -68,29 +69,26 @@ export default async function ToolPage({ params }: ToolPageProps) {
         </div>
       </div>
 
-      {/*
-       * Platzhalter für den Tool-Inhalt.
-       * Die einzelnen Tools werden in PROJ-3, PROJ-4, PROJ-5 implementiert
-       * und an dieser Stelle eingehängt.
-       */}
-      <Card className="border-dashed bg-s1/60">
-        <CardHeader>
-          <CardTitle className="text-tx">
-            {isAvailable
-              ? "Tool-Inhalt folgt"
-              : "Dieses Werkzeug ist noch in Vorbereitung"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-mu">
-          <p>
-            Die App-Shell und das Routing stehen. Die eigentliche Eingabemaske
-            und Berechnung wird in einem späteren Feature-Ticket implementiert.
-          </p>
-          <p>
-            Tool-Slug: <code className="rounded-sm bg-s2 px-1.5 py-0.5 text-tx">{tool.slug}</code>
-          </p>
-        </CardContent>
-      </Card>
+      {slug === "gauenwangen" ? (
+        <GauenwangenTool />
+      ) : (
+        <Card className="border-dashed bg-s1/60">
+          <CardHeader>
+            <CardTitle className="text-tx">
+              {isAvailable ? "Tool-Inhalt folgt" : "Dieses Werkzeug ist noch in Vorbereitung"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-mu">
+            <p>
+              Die App-Shell und das Routing stehen. Die eigentliche Eingabemaske
+              und Berechnung wird in einem späteren Feature-Ticket implementiert.
+            </p>
+            <p>
+              Tool-Slug: <code className="rounded-sm bg-s2 px-1.5 py-0.5 text-tx">{tool.slug}</code>
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

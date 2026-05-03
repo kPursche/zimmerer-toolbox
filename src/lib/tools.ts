@@ -39,7 +39,7 @@ export const TOOLS: Tool[] = [
     description:
       "Berechnung der Schnittwinkel und Maße für Gauenwangen aus Dachneigung und Wangenhöhe.",
     icon: Triangle,
-    status: "coming-soon",
+    status: "available",
     category: "Dach",
   },
   {
