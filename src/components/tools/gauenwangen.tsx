@@ -393,25 +393,30 @@ function SeitenansichtSVG({
   const tanA = Math.tan(alphaRad);
   const tanG = Math.tan(gammaRad);
 
-  const lotA = t * Math.cos(alphaRad);
-  const lotG = t * Math.cos(gammaRad);
+  const cosA = Math.cos(alphaRad);
+  const cosG = Math.cos(gammaRad);
+  const lotA = t * cosA;
+  const lotG = t * cosG;
   const innerVorne = hvorne - lotA - lotG;
 
-  // SVG-Geometrie: verwendet b als visuelle Holzdicke (alle Hölzer gleich breit)
-  // Außenflächen (physikalisch):
+  // SVG-Geometrie: senkrechte Holzdicke = b für alle Hölzer
+  // Für ein geneigtes Holz gilt: senkrechter Abstand = vertikaler Abstand × cos(α)
+  // → vertikaler Abstand = b / cos(α), damit senkrechte Breite = b
   const outerH = (x: number) => x * tanA;           // Hauptdach Außenfläche (Unterkante)
   const outerG = (x: number) => hvorne + x * tanG;  // Gaube Außenfläche (Oberkante)
 
-  // SVG-Innenflächen mit b statt Lotschmiegentiefe:
-  const svgRefH = (x: number) => b + x * tanA;
-  const svgRefG = (x: number) => (hvorne - b) + x * tanG;
+  const svgRefH = (x: number) => b / cosA + x * tanA;
+  const svgRefG = (x: number) => (hvorne - b / cosG) + x * tanG;
 
-  // SVG-Innerer First: svgRefH(x) = svgRefG(x) → x = (hvorne - 2b) / (tanA - tanG)
-  const svgT = (hvorne - 2 * b) / (tanA - tanG);
+  // SVG-Innerer First: svgRefH(x) = svgRefG(x)
+  // b/cosA + x*tanA = (hvorne - b/cosG) + x*tanG
+  // x = (hvorne - b/cosA - b/cosG) / (tanA - tanG)
+  const svgT = (hvorne - b / cosA - b / cosG) / (tanA - tanG);
   const svgYInnerFirst = svgRefH(svgT);
 
-  // SVG-Spitzpunkt: outerG(x) = svgRefH(x) → x = (hvorne - b) / (tanA - tanG)
-  const svgT_gaubeFirst = (hvorne - b) / (tanA - tanG);
+  // SVG-Spitzpunkt: outerG(x) = svgRefH(x)
+  // hvorne + x*tanG = b/cosA + x*tanA → x = (hvorne - b/cosA) / (tanA - tanG)
+  const svgT_gaubeFirst = (hvorne - b / cosA) / (tanA - tanG);
   const svgYSpitz = svgRefH(svgT_gaubeFirst);
 
   // Äußerer First (Firstspitze): outerH = outerG → kein Lotschnitt, geometrisch korrekt
