@@ -397,25 +397,26 @@ function SeitenansichtSVG({
   const lotG = t * Math.cos(gammaRad);
   const innerVorne = hvorne - lotA - lotG;
 
-  // Außenflächen (y bei x):
+  // SVG-Geometrie: verwendet b als visuelle Holzdicke (alle Hölzer gleich breit)
+  // Außenflächen (physikalisch):
   const outerH = (x: number) => x * tanA;           // Hauptdach Außenfläche (Unterkante)
   const outerG = (x: number) => hvorne + x * tanG;  // Gaube Außenfläche (Oberkante)
-  // Innenflächen:
-  const refH = (x: number) => lotA + x * tanA;
-  const refG = (x: number) => (hvorne - lotG) + x * tanG;
 
-  // Innerer First: Schnittpunkt der Innenflächen → refH(T) = refG(T)
-  const yInnerFirst = refH(T);
+  // SVG-Innenflächen mit b statt Lotschmiegentiefe:
+  const svgRefH = (x: number) => b + x * tanA;
+  const svgRefG = (x: number) => (hvorne - b) + x * tanG;
 
-  // Spitzpunkt (Gaubenholz-Außenfläche trifft Hauptdachholz-Innenfläche):
-  // outerG(x) = refH(x)  →  x = (hvorne - lotA) / (tanA - tanG)
-  const T_gaubeFirst = (hvorne - lotA) / (tanA - tanG);
-  const ySpitz       = refH(T_gaubeFirst); // = outerG(T_gaubeFirst)
+  // SVG-Innerer First: svgRefH(x) = svgRefG(x) → x = (hvorne - 2b) / (tanA - tanG)
+  const svgT = (hvorne - 2 * b) / (tanA - tanG);
+  const svgYInnerFirst = svgRefH(svgT);
 
-  // Äußerer First (Firstspitze): Unterkante Hauptdach trifft Oberkante Gaubenholz
-  // outerH(x) = outerG(x)  →  x = hvorne / (tanA - tanG)
+  // SVG-Spitzpunkt: outerG(x) = svgRefH(x) → x = (hvorne - b) / (tanA - tanG)
+  const svgT_gaubeFirst = (hvorne - b) / (tanA - tanG);
+  const svgYSpitz = svgRefH(svgT_gaubeFirst);
+
+  // Äußerer First (Firstspitze): outerH = outerG → kein Lotschnitt, geometrisch korrekt
   const T_outer     = hvorne / (tanA - tanG);
-  const yOuterFirst = T_outer * tanA; // = outerH(T_outer) = outerG(T_outer)
+  const yOuterFirst = T_outer * tanA;
 
   const yMin = 0;
   const yMax = yOuterFirst; // höchster Punkt = Firstspitze
@@ -445,50 +446,44 @@ function SeitenansichtSVG({
       </defs>
       <rect x={PL} y={PT} width={dW} height={dH} fill="url(#gw-grid)" rx="4" />
 
-      {/* ── Hauptdachholz ── Viereck
-          Außenfläche (Unterkante): (0,0) → Firstspitze (T_outer, yOuterFirst) — kein Lotschnitt!
-          First-Schmiege:           (T_outer, yOuterFirst) → Spitzpunkt (T_gaubeFirst, ySpitz)
-          Innenfläche (Oberkante):  (T_gaubeFirst, ySpitz) → (0, lotA) */}
+      {/* ── Hauptdachholz ── Außenfläche (Unterkante) → Firstspitze → Spitzpunkt → SVG-Innenfläche */}
       <polygon
         points={pts(
-          [0,       outerH(0)],    // Vorne unten  (Außenfläche)
-          [T_outer,  yOuterFirst], // Firstspitze  (outerH = outerG, kein Lotschnitt)
-          [T_gaubeFirst, ySpitz],  // Spitzpunkt   (Innenfläche endet hier)
-          [0,       refH(0)],      // Vorne oben   (Innenfläche)
+          [0,              outerH(0)],      // Vorne unten  (Außenfläche)
+          [T_outer,        yOuterFirst],    // Firstspitze  (kein Lotschnitt)
+          [svgT_gaubeFirst, svgYSpitz],     // Spitzpunkt   (SVG-Innenfläche endet hier)
+          [0,              svgRefH(0)],     // Vorne oben   (SVG-Innenfläche)
         )}
-        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1.5"
+        fill="#c9924a" fillOpacity="0.9" stroke="none"
       />
 
-      {/* ── Gaubenholz ── Viereck, schmiegt sich auf Innenfläche des Hauptdachholzes
-          Innenfläche (Unterkante): (0,hvorne-lotG) → innerer First (T, yInnerFirst)
-          Auflager auf refH:        (T, yInnerFirst) → Spitzpunkt (T_gaubeFirst, ySpitz)
-          Außenfläche (Oberkante):  (T_gaubeFirst, ySpitz) ← (0, hvorne) */}
+      {/* ── Gaubenholz ── schmiegt sich auf SVG-Innenfläche des Hauptdachholzes */}
       <polygon
         points={pts(
-          [0,           refG(0)],      // Vorne unten  (Innenfläche)
-          [T,           yInnerFirst],  // Innerer First (Innenflächen treffen sich)
-          [T_gaubeFirst, ySpitz],      // Spitzpunkt   (Gaubenholz läuft spitz aus)
-          [0,           outerG(0)],    // Vorne oben   (Außenfläche)
+          [0,              svgRefG(0)],     // Vorne unten  (SVG-Innenfläche)
+          [svgT,           svgYInnerFirst], // SVG-Innerer First
+          [svgT_gaubeFirst, svgYSpitz],     // Spitzpunkt   (läuft spitz aus)
+          [0,              outerG(0)],      // Vorne oben   (Außenfläche)
         )}
-        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1.5"
+        fill="#c9924a" fillOpacity="0.9" stroke="none"
       />
 
-      {/* ── Lothölzer ── Parallelogramme zwischen refH und refG */}
+      {/* ── Lothölzer ── Parallelogramme zwischen svgRefH und svgRefG */}
       {lothölzer.map((lot) => {
         const x0 = Math.max(b, lot.abstand - b / 2);
         const x1 = Math.min(T - 0.1, lot.abstand + b / 2);
         return (
           <polygon key={lot.nr}
-            points={pts([x0, refH(x0)], [x1, refH(x1)], [x1, refG(x1)], [x0, refG(x0)])}
-            fill="#6fa8d4" fillOpacity="0.85" stroke="#5090c0" strokeWidth="1.5"
+            points={pts([x0, svgRefH(x0)], [x1, svgRefH(x1)], [x1, svgRefG(x1)], [x0, svgRefG(x0)])}
+            fill="#6fa8d4" fillOpacity="0.85" stroke="none"
           />
         );
       })}
 
       {/* ── Gaubeneckständer ── Parallelogramm von x=0 bis x=b */}
       <polygon
-        points={pts([0, refH(0)], [b, refH(b)], [b, refG(b)], [0, refG(0)])}
-        fill="#7fb87a" fillOpacity="0.85" stroke="#5a9060" strokeWidth="1.5"
+        points={pts([0, svgRefH(0)], [b, svgRefH(b)], [b, svgRefG(b)], [0, svgRefG(0)])}
+        fill="#7fb87a" fillOpacity="0.85" stroke="none"
       />
 
       {/* ── Bemaßung: Gesamthöhe hvorne (links, grau) ── */}
@@ -504,13 +499,13 @@ function SeitenansichtSVG({
       </text>
 
       {/* ── Bemaßung: Eckständer-Innenmass (links, grün) ── */}
-      <line x1={sx(0) - 18} y1={sy(refH(0))} x2={sx(0) - 18} y2={sy(refG(0))} stroke="#7fb87a" strokeWidth="1.5" />
-      <line x1={sx(0) - 23} y1={sy(refH(0))} x2={sx(0) - 13} y2={sy(refH(0))} stroke="#7fb87a" strokeWidth="1.5" />
-      <line x1={sx(0) - 23} y1={sy(refG(0))} x2={sx(0) - 13} y2={sy(refG(0))} stroke="#7fb87a" strokeWidth="1.5" />
+      <line x1={sx(0) - 18} y1={sy(svgRefH(0))} x2={sx(0) - 18} y2={sy(svgRefG(0))} stroke="#7fb87a" strokeWidth="1.5" />
+      <line x1={sx(0) - 23} y1={sy(svgRefH(0))} x2={sx(0) - 13} y2={sy(svgRefH(0))} stroke="#7fb87a" strokeWidth="1.5" />
+      <line x1={sx(0) - 23} y1={sy(svgRefG(0))} x2={sx(0) - 13} y2={sy(svgRefG(0))} stroke="#7fb87a" strokeWidth="1.5" />
       <text
-        x={sx(0) - 20} y={(sy(refH(0)) + sy(refG(0))) / 2 + 4}
+        x={sx(0) - 20} y={(sy(svgRefH(0)) + sy(svgRefG(0))) / 2 + 4}
         fill="#7fb87a" fontSize="8" textAnchor="middle"
-        transform={`rotate(-90,${sx(0) - 20},${(sy(refH(0)) + sy(refG(0))) / 2})`}
+        transform={`rotate(-90,${sx(0) - 20},${(sy(svgRefH(0)) + sy(svgRefG(0))) / 2})`}
       >
         {fmt(round1(innerVorne))} cm
       </text>
@@ -530,7 +525,7 @@ function SeitenansichtSVG({
       {/* Ersten Lotholz-Höhe einblenden */}
       {lothölzer.length > 0 && (() => {
         const l = lothölzer[0];
-        const midY = (sy(refH(l.abstand)) + sy(refG(l.abstand))) / 2;
+        const midY = (sy(svgRefH(l.abstand)) + sy(svgRefG(l.abstand))) / 2;
         const labelX = sx(Math.min(l.abstand + b / 2, T) + 2);
         return (
           <text x={labelX} y={midY + 4} fill="#6fa8d4" fontSize="9" dominantBaseline="auto">
