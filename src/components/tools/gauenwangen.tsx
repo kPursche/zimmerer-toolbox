@@ -404,17 +404,23 @@ function SeitenansichtSVG({
   const refH = (x: number) => lotA + x * tanA;
   const refG = (x: number) => (hvorne - lotG) + x * tanG;
 
-  const yMin = 0;
-  const yMax = outerG(T);
+  // Äußerer First: Schnittpunkt der Außenflächen → outerH(T_outer) = outerG(T_outer)
+  // T_outer = hvorne / (tanA - tanG)  [≥ T, da innerVorne ≤ hvorne]
+  const T_outer     = hvorne / (tanA - tanG);
+  const yOuterFirst = T_outer * tanA;        // Spitzpunkt beider Außenflächen
+  const yInnerFirst = refH(T);              // Schnittpunkt der Innenflächen (= refG(T))
 
-  const scaleX = dW / T;
+  const yMin = 0;
+  const yMax = yOuterFirst;
+
+  const scaleX = dW / T_outer;
   const scaleY = dH / (yMax - yMin);
   const scale  = Math.min(scaleX, scaleY) * 0.92;
 
   const sx = (x: number) => PL + x * scale;
   const sy = (y: number) => PT + (yMax - y) * scale;
 
-  const Cx = sx(T); // x-Koordinate First im SVG
+  const Cx = sx(T); // x-Koordinate innerer First (für Bemaßung)
 
   // Polygon-Helper
   const pts = (...pairs: [number, number][]) =>
@@ -433,29 +439,31 @@ function SeitenansichtSVG({
       <rect x={PL} y={PT} width={dW} height={dH} fill="url(#gw-grid)" rx="4" />
 
       {/* ── Hauptdachholz ──
-          Polygon: Außenfläche unten, Innenfläche oben, Vorderkante x=0, Hinterkante x=T
-          Vorderkante: lotrecht von outerH(0)=0 bis refH(0)=lotA
-          Hinterkante: lotrecht von outerH(T) bis refH(T) */}
+          Außenfläche (Unterkante): von (0,0) bis Spitzpunkt (T_outer, yOuterFirst)
+          Innenfläche (Oberkante):  von (0,lotA) bis innerem First (T, yInnerFirst)
+          Abschnitt First: Kante von (T, yInnerFirst) → (T_outer, yOuterFirst) = First-Schmiege */}
       <polygon
         points={pts(
-          [0, outerH(0)],  // Vorne unten (Außenfläche)
-          [T, outerH(T)],  // Hinten unten (Außenfläche)
-          [T, refH(T)],    // Hinten oben  (Innenfläche)
-          [0, refH(0)],    // Vorne oben   (Innenfläche)
+          [0,      outerH(0)],    // Vorne unten  (Außenfläche)
+          [T_outer, yOuterFirst], // Spitzpunkt   (äußerer First)
+          [T,      yInnerFirst],  // Innerer First (Schmiege-Kante oben)
+          [0,      refH(0)],      // Vorne oben   (Innenfläche)
         )}
-        fill="#c9924a" fillOpacity="0.85" stroke="#a07030" strokeWidth="1"
+        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1"
       />
 
       {/* ── Gaubenholz ──
-          Polygon: Innenfläche unten, Außenfläche oben, Vorderkante x=0, Hinterkante x=T */}
+          Innenfläche (Unterkante): von (0,hvorne-lotG) bis innerem First (T, yInnerFirst)
+          Außenfläche (Oberkante):  von (0,hvorne) bis Spitzpunkt (T_outer, yOuterFirst)
+          Abschnitt First: selbe Schmiege-Kante (T,yInnerFirst)→(T_outer,yOuterFirst) */}
       <polygon
         points={pts(
-          [0, refG(0)],    // Vorne unten  (Innenfläche)
-          [T, refG(T)],    // Hinten unten (Innenfläche)
-          [T, outerG(T)],  // Hinten oben  (Außenfläche)
-          [0, outerG(0)],  // Vorne oben   (Außenfläche)
+          [0,      refG(0)],      // Vorne unten  (Innenfläche)
+          [T,      yInnerFirst],  // Innerer First (Schmiege-Kante unten)
+          [T_outer, yOuterFirst], // Spitzpunkt   (äußerer First)
+          [0,      outerG(0)],    // Vorne oben   (Außenfläche)
         )}
-        fill="#c9924a" fillOpacity="0.85" stroke="#a07030" strokeWidth="1"
+        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1"
       />
 
       {/* ── Lothölzer ── Parallelogramme zwischen refH und refG */}
