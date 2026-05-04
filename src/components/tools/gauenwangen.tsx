@@ -433,18 +433,14 @@ function SeitenansichtSVG({
       </defs>
       <rect x={PL} y={PT} width={dW} height={dH} fill="url(#gw-grid)" rx="4" />
 
-      {/* ── Hauptdachholz ──
-          Innenfläche (oben) = refH(x) = lotA + x·tan α
-          Mittelachse: refH(x) − lotA/2 */}
+      {/* ── Hauptdachholz ── von x=0 (Außenkante Eckständer) bis First */}
       <line
-        x1={sx(b)}  y1={sy(refH(b)  - lotA / 2)}
+        x1={sx(0)}  y1={sy(refH(0)  - lotA / 2)}
         x2={Cx}     y2={sy(refH(T)  - lotA / 2)}
         stroke="#c9924a" strokeWidth={beamPx} strokeLinecap="square"
       />
 
-      {/* ── Gaubenholz ──
-          Innenfläche (unten) = refG(x) = (hvorne − lotG) + x·tan γ
-          Mittelachse: refG(x) + lotG/2 */}
+      {/* ── Gaubenholz ── von x=0 bis First */}
       <line
         x1={sx(0)} y1={sy(refG(0) + lotG / 2)}
         x2={Cx}    y2={sy(refG(T) + lotG / 2)}
@@ -457,20 +453,32 @@ function SeitenansichtSVG({
       <line x1={sx(0)} y1={sy(refG(0))} x2={Cx} y2={sy(refG(T))}
         stroke="#504840" strokeWidth="1" strokeDasharray="4 3" />
 
-      {/* ── Lothölzer ── zwischen den Innenflächen */}
-      {lothölzer.map((lot) => (
-        <line key={lot.nr}
-          x1={sx(lot.abstand)} y1={sy(refH(lot.abstand))}
-          x2={sx(lot.abstand)} y2={sy(refG(lot.abstand))}
-          stroke="#6fa8d4" strokeWidth={beamPx} strokeLinecap="square"
-        />
-      ))}
+      {/* ── Lothölzer ── Parallelogramme zwischen den Innenflächen */}
+      {lothölzer.map((lot) => {
+        const x0 = Math.max(b, lot.abstand - b / 2);
+        const x1 = Math.min(T - 0.1, lot.abstand + b / 2);
+        return (
+          <polygon key={lot.nr}
+            points={[
+              `${sx(x0)},${sy(refH(x0))}`,
+              `${sx(x1)},${sy(refH(x1))}`,
+              `${sx(x1)},${sy(refG(x1))}`,
+              `${sx(x0)},${sy(refG(x0))}`,
+            ].join(' ')}
+            fill="#6fa8d4" fillOpacity="0.85" stroke="#6fa8d4" strokeWidth="1"
+          />
+        );
+      })}
 
-      {/* ── Gaubeneckständer ── zwischen den Innenflächen an x=0 */}
-      <line
-        x1={sx(0)} y1={sy(refH(0))}
-        x2={sx(0)} y2={sy(refG(0))}
-        stroke="#7fb87a" strokeWidth={beamPx} strokeLinecap="square"
+      {/* ── Gaubeneckständer ── Parallelogramm von x=0 bis x=b, zwischen den Innenflächen */}
+      <polygon
+        points={[
+          `${sx(0)},${sy(refH(0))}`,
+          `${sx(b)},${sy(refH(b))}`,
+          `${sx(b)},${sy(refG(b))}`,
+          `${sx(0)},${sy(refG(0))}`,
+        ].join(' ')}
+        fill="#7fb87a" fillOpacity="0.85" stroke="#7fb87a" strokeWidth="1"
       />
 
       {/* ── Bemaßung: Gesamthöhe hvorne (links, gestrichelt grau) ── */}
