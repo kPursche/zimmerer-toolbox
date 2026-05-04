@@ -407,16 +407,20 @@ function SeitenansichtSVG({
   // Innerer First: Schnittpunkt der Innenflächen → refH(T) = refG(T)
   const yInnerFirst = refH(T);
 
-  // Spitzpunkt: Außenfläche Gaubenholz trifft Innenfläche Hauptdachholz
-  // outerG(x) = refH(x)  →  hvorne + x·tanG = lotA + x·tanA
-  // x = (hvorne - lotA) / (tanA - tanG)
+  // Spitzpunkt (Gaubenholz-Außenfläche trifft Hauptdachholz-Innenfläche):
+  // outerG(x) = refH(x)  →  x = (hvorne - lotA) / (tanA - tanG)
   const T_gaubeFirst = (hvorne - lotA) / (tanA - tanG);
   const ySpitz       = refH(T_gaubeFirst); // = outerG(T_gaubeFirst)
 
-  const yMin = 0;
-  const yMax = ySpitz;
+  // Äußerer First (Firstspitze): Unterkante Hauptdach trifft Oberkante Gaubenholz
+  // outerH(x) = outerG(x)  →  x = hvorne / (tanA - tanG)
+  const T_outer     = hvorne / (tanA - tanG);
+  const yOuterFirst = T_outer * tanA; // = outerH(T_outer) = outerG(T_outer)
 
-  const scaleX = dW / T_gaubeFirst;
+  const yMin = 0;
+  const yMax = yOuterFirst; // höchster Punkt = Firstspitze
+
+  const scaleX = dW / T_outer;
   const scaleY = dH / (yMax - yMin);
   const scale  = Math.min(scaleX, scaleY) * 0.92;
 
@@ -441,33 +445,32 @@ function SeitenansichtSVG({
       </defs>
       <rect x={PL} y={PT} width={dW} height={dH} fill="url(#gw-grid)" rx="4" />
 
-      {/* ── Hauptdachholz ── Parallelogramm von x=0 bis x=T_gaubeFirst
-          Außenfläche (Unterkante): (0,0) → (T_gaubeFirst, outerH(T_gaubeFirst))
-          Innenfläche (Oberkante):  (0,lotA) → (T_gaubeFirst, ySpitz)
-          Rückseite: lotrechter Schnitt bei x=T_gaubeFirst, Höhe=lotA */}
+      {/* ── Hauptdachholz ── Viereck
+          Außenfläche (Unterkante): (0,0) → Firstspitze (T_outer, yOuterFirst) — kein Lotschnitt!
+          First-Schmiege:           (T_outer, yOuterFirst) → Spitzpunkt (T_gaubeFirst, ySpitz)
+          Innenfläche (Oberkante):  (T_gaubeFirst, ySpitz) → (0, lotA) */}
       <polygon
         points={pts(
-          [0,           outerH(0)],           // Vorne unten  (Außenfläche)
-          [T_gaubeFirst, outerH(T_gaubeFirst)],// Hinten unten (Außenfläche)
-          [T_gaubeFirst, ySpitz],              // Hinten oben  (Innenfläche = Spitzpunkt)
-          [0,           refH(0)],              // Vorne oben   (Innenfläche)
+          [0,       outerH(0)],    // Vorne unten  (Außenfläche)
+          [T_outer,  yOuterFirst], // Firstspitze  (outerH = outerG, kein Lotschnitt)
+          [T_gaubeFirst, ySpitz],  // Spitzpunkt   (Innenfläche endet hier)
+          [0,       refH(0)],      // Vorne oben   (Innenfläche)
         )}
-        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1"
+        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1.5"
       />
 
       {/* ── Gaubenholz ── Viereck, schmiegt sich auf Innenfläche des Hauptdachholzes
-          Innenfläche (Unterkante): (0, hvorne-lotG) → innerer First (T, yInnerFirst)
+          Innenfläche (Unterkante): (0,hvorne-lotG) → innerer First (T, yInnerFirst)
           Auflager auf refH:        (T, yInnerFirst) → Spitzpunkt (T_gaubeFirst, ySpitz)
-          Außenfläche (Oberkante):  (T_gaubeFirst, ySpitz) ← (0, hvorne)
-          Vorderkante: (0,hvorne) → (0, hvorne-lotG) */}
+          Außenfläche (Oberkante):  (T_gaubeFirst, ySpitz) ← (0, hvorne) */}
       <polygon
         points={pts(
           [0,           refG(0)],      // Vorne unten  (Innenfläche)
           [T,           yInnerFirst],  // Innerer First (Innenflächen treffen sich)
-          [T_gaubeFirst, ySpitz],      // Spitzpunkt   (Gaubenholz-Außenfläche auf refH)
+          [T_gaubeFirst, ySpitz],      // Spitzpunkt   (Gaubenholz läuft spitz aus)
           [0,           outerG(0)],    // Vorne oben   (Außenfläche)
         )}
-        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1"
+        fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1.5"
       />
 
       {/* ── Lothölzer ── Parallelogramme zwischen refH und refG */}
@@ -477,7 +480,7 @@ function SeitenansichtSVG({
         return (
           <polygon key={lot.nr}
             points={pts([x0, refH(x0)], [x1, refH(x1)], [x1, refG(x1)], [x0, refG(x0)])}
-            fill="#6fa8d4" fillOpacity="0.85" stroke="#5090c0" strokeWidth="1"
+            fill="#6fa8d4" fillOpacity="0.85" stroke="#5090c0" strokeWidth="1.5"
           />
         );
       })}
@@ -485,7 +488,7 @@ function SeitenansichtSVG({
       {/* ── Gaubeneckständer ── Parallelogramm von x=0 bis x=b */}
       <polygon
         points={pts([0, refH(0)], [b, refH(b)], [b, refG(b)], [0, refG(0)])}
-        fill="#7fb87a" fillOpacity="0.85" stroke="#5a9060" strokeWidth="1"
+        fill="#7fb87a" fillOpacity="0.85" stroke="#5a9060" strokeWidth="1.5"
       />
 
       {/* ── Bemaßung: Gesamthöhe hvorne (links, grau) ── */}
