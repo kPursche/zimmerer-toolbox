@@ -404,23 +404,26 @@ function SeitenansichtSVG({
   const refH = (x: number) => lotA + x * tanA;
   const refG = (x: number) => (hvorne - lotG) + x * tanG;
 
-  // Äußerer First: Schnittpunkt der Außenflächen → outerH(T_outer) = outerG(T_outer)
-  // T_outer = hvorne / (tanA - tanG)  [≥ T, da innerVorne ≤ hvorne]
-  const T_outer     = hvorne / (tanA - tanG);
-  const yOuterFirst = T_outer * tanA;        // Spitzpunkt beider Außenflächen
-  const yInnerFirst = refH(T);              // Schnittpunkt der Innenflächen (= refG(T))
+  // Innerer First: Schnittpunkt der Innenflächen → refH(T) = refG(T)
+  const yInnerFirst = refH(T);
+
+  // Spitzpunkt: Außenfläche Gaubenholz trifft Innenfläche Hauptdachholz
+  // outerG(x) = refH(x)  →  hvorne + x·tanG = lotA + x·tanA
+  // x = (hvorne - lotA) / (tanA - tanG)
+  const T_gaubeFirst = (hvorne - lotA) / (tanA - tanG);
+  const ySpitz       = refH(T_gaubeFirst); // = outerG(T_gaubeFirst)
 
   const yMin = 0;
-  const yMax = yOuterFirst;
+  const yMax = ySpitz;
 
-  const scaleX = dW / T_outer;
+  const scaleX = dW / T_gaubeFirst;
   const scaleY = dH / (yMax - yMin);
   const scale  = Math.min(scaleX, scaleY) * 0.92;
 
   const sx = (x: number) => PL + x * scale;
   const sy = (y: number) => PT + (yMax - y) * scale;
 
-  const Cx = sx(T); // x-Koordinate innerer First (für Bemaßung)
+  const Cx = sx(T); // x-Koordinate innerer First (Bemaßung T)
 
   // Polygon-Helper
   const pts = (...pairs: [number, number][]) =>
@@ -438,30 +441,31 @@ function SeitenansichtSVG({
       </defs>
       <rect x={PL} y={PT} width={dW} height={dH} fill="url(#gw-grid)" rx="4" />
 
-      {/* ── Hauptdachholz ──
-          Außenfläche (Unterkante): von (0,0) bis Spitzpunkt (T_outer, yOuterFirst)
-          Innenfläche (Oberkante):  von (0,lotA) bis innerem First (T, yInnerFirst)
-          Abschnitt First: Kante von (T, yInnerFirst) → (T_outer, yOuterFirst) = First-Schmiege */}
+      {/* ── Hauptdachholz ── Parallelogramm von x=0 bis x=T_gaubeFirst
+          Außenfläche (Unterkante): (0,0) → (T_gaubeFirst, outerH(T_gaubeFirst))
+          Innenfläche (Oberkante):  (0,lotA) → (T_gaubeFirst, ySpitz)
+          Rückseite: lotrechter Schnitt bei x=T_gaubeFirst, Höhe=lotA */}
       <polygon
         points={pts(
-          [0,      outerH(0)],    // Vorne unten  (Außenfläche)
-          [T_outer, yOuterFirst], // Spitzpunkt   (äußerer First)
-          [T,      yInnerFirst],  // Innerer First (Schmiege-Kante oben)
-          [0,      refH(0)],      // Vorne oben   (Innenfläche)
+          [0,           outerH(0)],           // Vorne unten  (Außenfläche)
+          [T_gaubeFirst, outerH(T_gaubeFirst)],// Hinten unten (Außenfläche)
+          [T_gaubeFirst, ySpitz],              // Hinten oben  (Innenfläche = Spitzpunkt)
+          [0,           refH(0)],              // Vorne oben   (Innenfläche)
         )}
         fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1"
       />
 
-      {/* ── Gaubenholz ──
-          Innenfläche (Unterkante): von (0,hvorne-lotG) bis innerem First (T, yInnerFirst)
-          Außenfläche (Oberkante):  von (0,hvorne) bis Spitzpunkt (T_outer, yOuterFirst)
-          Abschnitt First: selbe Schmiege-Kante (T,yInnerFirst)→(T_outer,yOuterFirst) */}
+      {/* ── Gaubenholz ── Viereck, schmiegt sich auf Innenfläche des Hauptdachholzes
+          Innenfläche (Unterkante): (0, hvorne-lotG) → innerer First (T, yInnerFirst)
+          Auflager auf refH:        (T, yInnerFirst) → Spitzpunkt (T_gaubeFirst, ySpitz)
+          Außenfläche (Oberkante):  (T_gaubeFirst, ySpitz) ← (0, hvorne)
+          Vorderkante: (0,hvorne) → (0, hvorne-lotG) */}
       <polygon
         points={pts(
-          [0,      refG(0)],      // Vorne unten  (Innenfläche)
-          [T,      yInnerFirst],  // Innerer First (Schmiege-Kante unten)
-          [T_outer, yOuterFirst], // Spitzpunkt   (äußerer First)
-          [0,      outerG(0)],    // Vorne oben   (Außenfläche)
+          [0,           refG(0)],      // Vorne unten  (Innenfläche)
+          [T,           yInnerFirst],  // Innerer First (Innenflächen treffen sich)
+          [T_gaubeFirst, ySpitz],      // Spitzpunkt   (Gaubenholz-Außenfläche auf refH)
+          [0,           outerG(0)],    // Vorne oben   (Außenfläche)
         )}
         fill="#c9924a" fillOpacity="0.9" stroke="#a07030" strokeWidth="1"
       />
