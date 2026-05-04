@@ -369,15 +369,11 @@ function HkZeile({ name, laenge, schnitte }: { name: string; laenge: number; sch
 
 // ─── SVG Seitenansicht ────────────────────────────────────────────────────────
 //
-// hvorne = Außenmaß der Ecke (Unterkante Hauptdachholz → Oberkante Gaubenholz)
-//
-// Referenzlinien = Innenflächen der Hölzer (Grenzen zum Ständerraum):
-//   y_H(x) = lotA + x·tan α   (Hauptdach-Innenfläche, oberste Fläche des Hauptdachholzes)
-//   y_G(x) = (hvorne − lotG) + x·tan γ   (Gaube-Innenfläche, unterste Fläche des Gaubenholzes)
-//
-// Außenflächen:
-//   Hauptdachholz außen: x·tan α        (bei x=0 → y=0)
-//   Gaubenholz außen:    hvorne + x·tan γ (bei x=0 → y=hvorne)
+// Alle Hölzer als Polygone (4 Ecken) gezeichnet — kein Stroke-based rendering.
+// Querschnitte:
+//   Hauptdachholz: Außenfläche (y=x·tanα) → Innenfläche (y=refH(x)=lotA+x·tanα)
+//   Gaubenholz:    Innenfläche (y=refG(x)=(hvorne-lotG)+x·tanγ) → Außenfläche (y=hvorne+x·tanγ)
+//   Eckständer/Lothölzer: Parallelogramm zwischen refH und refG
 
 function SeitenansichtSVG({
   T, hvorne, alphaDeg, gammaDeg, b, t, lothölzer,
@@ -394,32 +390,35 @@ function SeitenansichtSVG({
 
   const alphaRad = toRad(alphaDeg);
   const gammaRad = toRad(gammaDeg);
+  const tanA = Math.tan(alphaRad);
+  const tanG = Math.tan(gammaRad);
 
-  const lotA = t * Math.cos(alphaRad); // Lotschmiege Hauptdachholz
-  const lotG = t * Math.cos(gammaRad); // Lotschmiege Gaubenholz
+  const lotA = t * Math.cos(alphaRad);
+  const lotG = t * Math.cos(gammaRad);
   const innerVorne = hvorne - lotA - lotG;
 
-  // Bounding Box: y=0 (Unterkante Hauptdachholz bei x=0) bis Oberkante Gaubenholz am First
+  // Außenflächen (y bei x):
+  const outerH = (x: number) => x * tanA;           // Hauptdach Außenfläche (Unterkante)
+  const outerG = (x: number) => hvorne + x * tanG;  // Gaube Außenfläche (Oberkante)
+  // Innenflächen:
+  const refH = (x: number) => lotA + x * tanA;
+  const refG = (x: number) => (hvorne - lotG) + x * tanG;
+
   const yMin = 0;
-  const yMax = hvorne + T * Math.tan(gammaRad);
+  const yMax = outerG(T);
 
   const scaleX = dW / T;
   const scaleY = dH / (yMax - yMin);
   const scale  = Math.min(scaleX, scaleY) * 0.92;
 
-  // World → SVG  (SVG Y wächst nach unten)
   const sx = (x: number) => PL + x * scale;
   const sy = (y: number) => PT + (yMax - y) * scale;
 
-  // Referenzlinien (Innenflächen)
-  const refH = (x: number) => lotA + x * Math.tan(alphaRad);
-  const refG = (x: number) => (hvorne - lotG) + x * Math.tan(gammaRad);
+  const Cx = sx(T); // x-Koordinate First im SVG
 
-  const beamPx = Math.max(5, t * scale * 0.85);
-  const halfBpx = beamPx / 2;
-
-  // First-Punkt (Schnittpunkt der Referenzlinien)
-  const Cx = sx(T), Cy = sy(refH(T));
+  // Polygon-Helper
+  const pts = (...pairs: [number, number][]) =>
+    pairs.map(([x, y]) => `${sx(x)},${sy(y)}`).join(' ');
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Seitenansicht Gaubenwange">
@@ -433,55 +432,51 @@ function SeitenansichtSVG({
       </defs>
       <rect x={PL} y={PT} width={dW} height={dH} fill="url(#gw-grid)" rx="4" />
 
-      {/* ── Hauptdachholz ── von x=0 (Außenkante Eckständer) bis First */}
-      <line
-        x1={sx(0)}  y1={sy(refH(0)  - lotA / 2)}
-        x2={Cx}     y2={sy(refH(T)  - lotA / 2)}
-        stroke="#c9924a" strokeWidth={beamPx} strokeLinecap="square"
+      {/* ── Hauptdachholz ──
+          Polygon: Außenfläche unten, Innenfläche oben, Vorderkante x=0, Hinterkante x=T
+          Vorderkante: lotrecht von outerH(0)=0 bis refH(0)=lotA
+          Hinterkante: lotrecht von outerH(T) bis refH(T) */}
+      <polygon
+        points={pts(
+          [0, outerH(0)],  // Vorne unten (Außenfläche)
+          [T, outerH(T)],  // Hinten unten (Außenfläche)
+          [T, refH(T)],    // Hinten oben  (Innenfläche)
+          [0, refH(0)],    // Vorne oben   (Innenfläche)
+        )}
+        fill="#c9924a" fillOpacity="0.85" stroke="#a07030" strokeWidth="1"
       />
 
-      {/* ── Gaubenholz ── von x=0 bis First */}
-      <line
-        x1={sx(0)} y1={sy(refG(0) + lotG / 2)}
-        x2={Cx}    y2={sy(refG(T) + lotG / 2)}
-        stroke="#c9924a" strokeWidth={beamPx} strokeLinecap="square"
+      {/* ── Gaubenholz ──
+          Polygon: Innenfläche unten, Außenfläche oben, Vorderkante x=0, Hinterkante x=T */}
+      <polygon
+        points={pts(
+          [0, refG(0)],    // Vorne unten  (Innenfläche)
+          [T, refG(T)],    // Hinten unten (Innenfläche)
+          [T, outerG(T)],  // Hinten oben  (Außenfläche)
+          [0, outerG(0)],  // Vorne oben   (Außenfläche)
+        )}
+        fill="#c9924a" fillOpacity="0.85" stroke="#a07030" strokeWidth="1"
       />
 
-      {/* ── Referenzlinien (Innenflächen, gestrichelt) ── */}
-      <line x1={sx(0)} y1={sy(refH(0))} x2={Cx} y2={sy(refH(T))}
-        stroke="#504840" strokeWidth="1" strokeDasharray="4 3" />
-      <line x1={sx(0)} y1={sy(refG(0))} x2={Cx} y2={sy(refG(T))}
-        stroke="#504840" strokeWidth="1" strokeDasharray="4 3" />
-
-      {/* ── Lothölzer ── Parallelogramme zwischen den Innenflächen */}
+      {/* ── Lothölzer ── Parallelogramme zwischen refH und refG */}
       {lothölzer.map((lot) => {
         const x0 = Math.max(b, lot.abstand - b / 2);
         const x1 = Math.min(T - 0.1, lot.abstand + b / 2);
         return (
           <polygon key={lot.nr}
-            points={[
-              `${sx(x0)},${sy(refH(x0))}`,
-              `${sx(x1)},${sy(refH(x1))}`,
-              `${sx(x1)},${sy(refG(x1))}`,
-              `${sx(x0)},${sy(refG(x0))}`,
-            ].join(' ')}
-            fill="#6fa8d4" fillOpacity="0.85" stroke="#6fa8d4" strokeWidth="1"
+            points={pts([x0, refH(x0)], [x1, refH(x1)], [x1, refG(x1)], [x0, refG(x0)])}
+            fill="#6fa8d4" fillOpacity="0.85" stroke="#5090c0" strokeWidth="1"
           />
         );
       })}
 
-      {/* ── Gaubeneckständer ── Parallelogramm von x=0 bis x=b, zwischen den Innenflächen */}
+      {/* ── Gaubeneckständer ── Parallelogramm von x=0 bis x=b */}
       <polygon
-        points={[
-          `${sx(0)},${sy(refH(0))}`,
-          `${sx(b)},${sy(refH(b))}`,
-          `${sx(b)},${sy(refG(b))}`,
-          `${sx(0)},${sy(refG(0))}`,
-        ].join(' ')}
-        fill="#7fb87a" fillOpacity="0.85" stroke="#7fb87a" strokeWidth="1"
+        points={pts([0, refH(0)], [b, refH(b)], [b, refG(b)], [0, refG(0)])}
+        fill="#7fb87a" fillOpacity="0.85" stroke="#5a9060" strokeWidth="1"
       />
 
-      {/* ── Bemaßung: Gesamthöhe hvorne (links, gestrichelt grau) ── */}
+      {/* ── Bemaßung: Gesamthöhe hvorne (links, grau) ── */}
       <line x1={sx(0) - 30} y1={sy(0)}       x2={sx(0) - 30} y2={sy(hvorne)} stroke="#504840" strokeWidth="1" strokeDasharray="3 2" />
       <line x1={sx(0) - 35} y1={sy(0)}       x2={sx(0) - 25} y2={sy(0)}      stroke="#504840" strokeWidth="1" />
       <line x1={sx(0) - 35} y1={sy(hvorne)}  x2={sx(0) - 25} y2={sy(hvorne)} stroke="#504840" strokeWidth="1" />
@@ -493,7 +488,7 @@ function SeitenansichtSVG({
         {fmt(hvorne)} cm
       </text>
 
-      {/* ── Bemaßung: Eckständer (links, farbig) ── */}
+      {/* ── Bemaßung: Eckständer-Innenmass (links, grün) ── */}
       <line x1={sx(0) - 18} y1={sy(refH(0))} x2={sx(0) - 18} y2={sy(refG(0))} stroke="#7fb87a" strokeWidth="1.5" />
       <line x1={sx(0) - 23} y1={sy(refH(0))} x2={sx(0) - 13} y2={sy(refH(0))} stroke="#7fb87a" strokeWidth="1.5" />
       <line x1={sx(0) - 23} y1={sy(refG(0))} x2={sx(0) - 13} y2={sy(refG(0))} stroke="#7fb87a" strokeWidth="1.5" />
@@ -521,9 +516,9 @@ function SeitenansichtSVG({
       {lothölzer.length > 0 && (() => {
         const l = lothölzer[0];
         const midY = (sy(refH(l.abstand)) + sy(refG(l.abstand))) / 2;
+        const labelX = sx(Math.min(l.abstand + b / 2, T) + 2);
         return (
-          <text x={sx(l.abstand) + halfBpx + 3} y={midY + 4}
-            fill="#6fa8d4" fontSize="9" dominantBaseline="auto">
+          <text x={labelX} y={midY + 4} fill="#6fa8d4" fontSize="9" dominantBaseline="auto">
             {fmt(round1(l.hoehe))} cm
           </text>
         );
@@ -531,11 +526,11 @@ function SeitenansichtSVG({
 
       {/* Legende */}
       <g transform={`translate(${PL}, ${H - 14})`}>
-        <line x1="0"   y1="0" x2="14"  y2="0" stroke="#7fb87a" strokeWidth="3" />
-        <text x="18"  y="4" fill="#7fb87a" fontSize="9">Eckständer</text>
-        <line x1="78"  y1="0" x2="92"  y2="0" stroke="#c9924a" strokeWidth="3" />
-        <text x="96"  y="4" fill="#c9924a" fontSize="9">Gaubendach- / Hauptdachholz</text>
-        <line x1="234" y1="0" x2="248" y2="0" stroke="#6fa8d4" strokeWidth="3" />
+        <rect x="0" y="-5" width="14" height="8" fill="#7fb87a" fillOpacity="0.85" />
+        <text x="18" y="4" fill="#7fb87a" fontSize="9">Eckständer</text>
+        <rect x="78" y="-5" width="14" height="8" fill="#c9924a" fillOpacity="0.85" />
+        <text x="96" y="4" fill="#c9924a" fontSize="9">Gaubendach- / Hauptdachholz</text>
+        <rect x="234" y="-5" width="14" height="8" fill="#6fa8d4" fillOpacity="0.85" />
         <text x="252" y="4" fill="#6fa8d4" fontSize="9">Lothölzer</text>
       </g>
     </svg>
