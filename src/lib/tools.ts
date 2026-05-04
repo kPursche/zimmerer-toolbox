@@ -35,9 +35,9 @@ export interface Tool {
 export const TOOLS: Tool[] = [
   {
     slug: "gauenwangen",
-    name: "Gauenwangen aufdoppeln",
+    name: "Gaubenwangen aufdoppeln",
     description:
-      "Berechnung der Schnittwinkel und Maße für Gauenwangen aus Dachneigung und Wangenhöhe.",
+      "Berechnung der Schnittwinkel und Maße für Gaubenwangen aus Dachneigung und Wangenhöhe.",
     icon: Triangle,
     status: "available",
     category: "Dach",

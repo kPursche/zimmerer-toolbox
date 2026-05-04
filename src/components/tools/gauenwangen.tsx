@@ -9,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,20 +23,20 @@ interface Eingaben {
   gaubendachNeigung: string;
   hauptdachNeigung: string;
   holzBreite: string;
-  holzHoehe: string;
+  holzTiefe: string;   // früher "Höhe (h)", jetzt "Tiefe"
   achsabstand: string;
 }
 
 interface Lotholz {
   nr: number;
   abstand: number;
-  hoehe: number;
+  hoehe: number; // lotrechte Länge zwischen den Holzoberkanten
 }
 
 interface Ergebnis {
   tiefe: number;
   yFirst: number;
-  L_vorderholz: number;
+  L_eckstaender: number;
   L_gaubendach: number;
   L_hauptdach: number;
   schnittVorneGaube: number;
@@ -52,6 +51,7 @@ function berechne(
   alphaDeg: number,
   gammaDeg: number,
   b: number,
+  t: number,       // Holztiefe (Querschnitt senkrecht zur Längsachse)
   achsabstand: number,
 ): Ergebnis {
   const alpha = toRad(alphaDeg);
@@ -59,29 +59,45 @@ function berechne(
   const tanA = Math.tan(alpha);
   const tanG = Math.tan(gamma);
 
-  // Horizontale Tiefe bis zum First
+  // Horizontale Tiefe bis zum First (Referenzlinien-Schnittpunkt)
   const T = hvorne / (tanA - tanG);
   const yFirst = T * tanA;
 
-  // Längen der Hauptkanten
-  const L_vorderholz = hvorne;
-  const L_hauptdach = (T - b) / Math.cos(alpha);   // beginnt an Innenkante Vorderholz
-  const L_gaubendach = (T + b) / Math.cos(gamma);  // endet leicht hinter dem First
+  // Dickenkorrektur: Wie viel vertikalen Raum belegen Hauptdach- und Gaubenholz?
+  // Ein Holz mit Tiefe t senkrecht zur Dachfläche hat die vertikale Projektion t·cos(Neigung)
+  const korrHaupt = t * Math.cos(alpha); // Hauptdachholz nimmt diese Höhe ein
+  const korrGaube = t * Math.cos(gamma); // Gaubenholz nimmt diese Höhe ein
+  const korrGes = korrHaupt + korrGaube;
 
-  // Schnittwinkel
-  const schnittVorneGaube = 90 - gammaDeg;  // Gaubendachholz an Vorderholz (67° bei 23°)
-  const schnittFirst = alphaDeg - gammaDeg; // Firstschnitt beide Hölzer (22° bei 45°-23°)
+  // Lotrechte Länge der Ständer = Abstand zwischen Oberkante Hauptdachholz und Unterkante Gaubenholz
+  const hEckstaender = hvorne - korrGes;
 
-  // Lothölzer: erste Position = Achsabstand, letzte vor dem First
+  const L_hauptdach = (T - b) / Math.cos(alpha);
+  const L_gaubendach = (T + b) / Math.cos(gamma);
+
+  const schnittVorneGaube = 90 - gammaDeg;
+  const schnittFirst = alphaDeg - gammaDeg;
+
+  // Lothölzer: ab erstem Achsabstand bis kurz vor den First
   const lothölzer: Lotholz[] = [];
   for (let x = achsabstand; x < T - b / 2; x += achsabstand) {
-    const hoehe = hvorne - x * (tanA - tanG);
+    // Lotrechte Höhe der Referenzlinien an Position x, minus Holzdicken
+    const hoehe = hvorne - x * (tanA - tanG) - korrGes;
     if (hoehe > 1) {
       lothölzer.push({ nr: lothölzer.length + 1, abstand: x, hoehe });
     }
   }
 
-  return { tiefe: T, yFirst, L_vorderholz, L_gaubendach, L_hauptdach, schnittVorneGaube, schnittFirst, lothölzer };
+  return {
+    tiefe: T,
+    yFirst,
+    L_eckstaender: hEckstaender,
+    L_gaubendach,
+    L_hauptdach,
+    schnittVorneGaube,
+    schnittFirst,
+    lothölzer,
+  };
 }
 
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
@@ -92,7 +108,7 @@ export function GauenwangenTool() {
     gaubendachNeigung: "23",
     hauptdachNeigung: "45",
     holzBreite: "6",
-    holzHoehe: "8",
+    holzTiefe: "8",
     achsabstand: "70",
   });
 
@@ -103,28 +119,28 @@ export function GauenwangenTool() {
   );
 
   const p = useMemo(() => ({
-    hvorne: parseFloat(e.eckhoeheVorne),
-    alpha: parseFloat(e.hauptdachNeigung),
-    gamma: parseFloat(e.gaubendachNeigung),
-    b: parseFloat(e.holzBreite),
-    h: parseFloat(e.holzHoehe),
+    hvorne:      parseFloat(e.eckhoeheVorne),
+    alpha:       parseFloat(e.hauptdachNeigung),
+    gamma:       parseFloat(e.gaubendachNeigung),
+    b:           parseFloat(e.holzBreite),
+    t:           parseFloat(e.holzTiefe),
     achsabstand: parseFloat(e.achsabstand),
   }), [e]);
 
   const fehler = useMemo((): string | null => {
-    if (isNaN(p.hvorne) || p.hvorne <= 0) return "Eckhöhe vorne muss größer als 0 sein.";
-    if (isNaN(p.gamma) || p.gamma <= 0 || p.gamma >= 90) return "Gaubendach-Neigung: 1°–89°";
-    if (isNaN(p.alpha) || p.alpha <= 0 || p.alpha >= 90) return "Hauptdach-Neigung: 1°–89°";
-    if (p.alpha <= p.gamma) return "Hauptdach-Neigung muss größer als Gaubendach-Neigung sein.";
-    if (isNaN(p.b) || p.b <= 0) return "Holz-Breite muss größer als 0 sein.";
-    if (isNaN(p.h) || p.h <= 0) return "Holz-Höhe muss größer als 0 sein.";
-    if (isNaN(p.achsabstand) || p.achsabstand <= 0) return "Achsabstand muss größer als 0 sein.";
+    if (isNaN(p.hvorne)      || p.hvorne <= 0)                  return "Eckhöhe vorne muss größer als 0 sein.";
+    if (isNaN(p.gamma)       || p.gamma <= 0  || p.gamma >= 90) return "Gaubendach-Neigung: 1°–89°";
+    if (isNaN(p.alpha)       || p.alpha <= 0  || p.alpha >= 90) return "Hauptdach-Neigung: 1°–89°";
+    if (p.alpha <= p.gamma)                                       return "Hauptdach-Neigung muss größer als Gaubendach-Neigung sein.";
+    if (isNaN(p.b)           || p.b <= 0)                       return "Holz-Breite muss größer als 0 sein.";
+    if (isNaN(p.t)           || p.t <= 0)                       return "Holz-Tiefe muss größer als 0 sein.";
+    if (isNaN(p.achsabstand) || p.achsabstand <= 0)             return "Achsabstand muss größer als 0 sein.";
     return null;
   }, [p]);
 
   const ergebnis = useMemo(() => {
     if (fehler) return null;
-    return berechne(p.hvorne, p.alpha, p.gamma, p.b, p.achsabstand);
+    return berechne(p.hvorne, p.alpha, p.gamma, p.b, p.t, p.achsabstand);
   }, [fehler, p]);
 
   return (
@@ -134,9 +150,7 @@ export function GauenwangenTool() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Eingaben</CardTitle>
-          <CardDescription>
-            Schleppdachgaube — alle Maße in cm, Winkel in Grad
-          </CardDescription>
+          <CardDescription>Schleppdachgaube — alle Maße in cm, Winkel in Grad</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <Gruppe label="Geometrie">
@@ -150,14 +164,14 @@ export function GauenwangenTool() {
             />
             <div className="grid grid-cols-2 gap-3">
               <EingabeFeld label="Gaubendach-Neigung" einheit="°" wert={e.gaubendachNeigung} onChange={setze("gaubendachNeigung")} min={1} max={89} step={0.5} />
-              <EingabeFeld label="Hauptdach-Neigung" einheit="°" wert={e.hauptdachNeigung} onChange={setze("hauptdachNeigung")} min={1} max={89} step={0.5} />
+              <EingabeFeld label="Hauptdach-Neigung"  einheit="°" wert={e.hauptdachNeigung}  onChange={setze("hauptdachNeigung")}  min={1} max={89} step={0.5} />
             </div>
           </Gruppe>
 
           <Gruppe label="Holz">
             <div className="grid grid-cols-2 gap-3">
               <EingabeFeld label="Breite (b)" einheit="cm" wert={e.holzBreite} onChange={setze("holzBreite")} min={1} step={0.5} />
-              <EingabeFeld label="Höhe (h)" einheit="cm" wert={e.holzHoehe} onChange={setze("holzHoehe")} min={1} step={0.5} />
+              <EingabeFeld label="Tiefe (t)"  einheit="cm" wert={e.holzTiefe}  onChange={setze("holzTiefe")}  min={1} step={0.5} />
             </div>
           </Gruppe>
 
@@ -191,7 +205,7 @@ export function GauenwangenTool() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base">Seitenansicht (maßstabsgetreu)</CardTitle>
                 <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
-                  <span className="rounded-sm bg-oak-alpha px-2 py-1 text-oak">Holz {p.b} × {p.h} cm</span>
+                  <span className="rounded-sm bg-oak-alpha px-2 py-1 text-oak">Holz {p.b} × {p.t} cm</span>
                   <span className="rounded-sm bg-s2 px-2 py-1 text-mu">Tiefe {fmt(ergebnis.tiefe)} cm</span>
                   <span className="rounded-sm bg-s2 px-2 py-1 text-mu">First {fmt(ergebnis.yFirst)} cm</span>
                 </div>
@@ -205,6 +219,7 @@ export function GauenwangenTool() {
                 alphaDeg={p.alpha}
                 gammaDeg={p.gamma}
                 b={p.b}
+                t={p.t}
                 lothölzer={ergebnis.lothölzer}
               />
             </CardContent>
@@ -214,7 +229,7 @@ export function GauenwangenTool() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Zuschnitte Hauptkanten</CardTitle>
-              <CardDescription>Querschnitt aller Hölzer: {p.b} × {p.h} cm</CardDescription>
+              <CardDescription>Querschnitt aller Hölzer: {p.b} × {p.t} cm</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -223,14 +238,14 @@ export function GauenwangenTool() {
                     <tr className="border-b border-border text-left">
                       <th className="pb-2 font-semibold text-tx">Holz</th>
                       <th className="pb-2 text-right font-semibold text-tx">Länge</th>
-                      <th className="pb-2 text-right font-semibold text-mu text-xs">Schnitte</th>
+                      <th className="pb-2 text-right text-xs font-semibold text-mu">Schnitte</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     <HkZeile
-                      name="Vorderholz (lotrecht)"
-                      laenge={ergebnis.L_vorderholz}
-                      schnitte={`oben ${fmt(round1(90 - p.gamma))}°`}
+                      name="Gaubeneckständer (lotrecht)"
+                      laenge={ergebnis.L_eckstaender}
+                      schnitte={`u ${fmt(round1(90 - p.alpha))}° / o ${fmt(round1(90 - p.gamma))}°`}
                     />
                     <HkZeile
                       name="Holz an Gaubendach"
@@ -320,6 +335,7 @@ function EingabeFeld({ label, einheit, wert, onChange, min, max, step, hinweis }
         <input
           type="number" value={wert} onChange={onChange}
           min={min} max={max} step={step} inputMode="decimal"
+          onFocus={(ev) => ev.target.select()}
           className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-tx outline-none"
         />
         <span className="shrink-0 border-l border-border bg-s3 px-3 py-2.5 text-xs font-semibold text-mu">
@@ -344,10 +360,10 @@ function HkZeile({ name, laenge, schnitte }: { name: string; laenge: number; sch
 // ─── SVG Seitenansicht ────────────────────────────────────────────────────────
 
 function SeitenansichtSVG({
-  T, yFirst, hvorne, alphaDeg, gammaDeg, b, lothölzer,
+  T, yFirst, hvorne, alphaDeg, gammaDeg, b, t, lothölzer,
 }: {
   T: number; yFirst: number; hvorne: number;
-  alphaDeg: number; gammaDeg: number; b: number;
+  alphaDeg: number; gammaDeg: number; b: number; t: number;
   lothölzer: Lotholz[];
 }) {
   const W = 560;
@@ -355,109 +371,111 @@ function SeitenansichtSVG({
   const PL = 55; const PR = 20; const PT = 20; const PB = 40;
   const dW = W - PL - PR;
   const dH = H - PT - PB;
-
   const scale = Math.min(dW / T, dH / yFirst) * 0.9;
 
-  // World → SVG (Y inverted)
   const sx = (x: number) => PL + x * scale;
   const sy = (y: number) => PT + dH - y * scale;
 
   const alphaRad = toRad(alphaDeg);
   const gammaRad = toRad(gammaDeg);
 
-  const beamPx = Math.max(5, b * scale * 0.8);
+  // Holzdicke in SVG-Pixel (für die Darstellungsbreite der Balken)
+  const beamPx = Math.max(5, t * scale * 0.8);
 
-  // Key points
-  const Ax = sx(0), Ay = sy(0);         // Vorderholz Fuß
-  const Bx = sx(0), By = sy(hvorne);    // Vorderholz Kopf
-  const Cx = sx(T), Cy = sy(yFirst);    // First
+  // Vertikale Dickenprojektionen
+  const dHaupt = t * Math.cos(alphaRad); // Hauptdachholz nimmt lotrecht
+  const dGaube = t * Math.cos(gammaRad); // Gaubenholz nimmt lotrecht
 
-  // Hauptdachholz: starts at inner face of Vorderholz on main roof
-  const HauptStartX = sx(b), HauptStartY = sy(b * Math.tan(alphaRad));
+  // First-Punkt (Schnitt der Referenzlinien)
+  const Cx = sx(T), Cy = sy(yFirst);
+
+  // Hauptdachholz Mittellinie: y = x·tan(α) + dHaupt/2
+  // Gaubenholz Mittellinie:    y = hvorne + x·tan(γ) - dGaube/2
+
+  // Vorderholz (Eckständer): zwischen Oberkante Hauptdach und Unterkante Gauben
+  const EckFussY  = sy(dHaupt);                  // Oberkante Hauptdachholz an x=0
+  const EckKopfY  = sy(hvorne - dGaube);          // Unterkante Gaubenholz an x=0
+
+  // Hauptdachholz: Centerline von x=b bis x=T
+  const HauptX1 = sx(b),  HauptY1 = sy(b * Math.tan(alphaRad) + dHaupt / 2);
+  const HauptX2 = Cx,     HauptY2 = sy(yFirst - dHaupt / 2 + dHaupt); // obere Kante am First
+
+  // Gaubenholz: Centerline von x=0 bis x=T
+  const GaubeX1 = sx(0),  GaubeY1 = sy(hvorne - dGaube / 2);
+  const GaubeX2 = Cx,     GaubeY2 = sy(yFirst + dGaube / 2);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" aria-label="Seitenansicht Gaubenwange">
       {/* Grid */}
       <defs>
-        <pattern id="gw-grid" width={scale * 50} height={scale * 50} patternUnits="userSpaceOnUse"
-          x={PL % (scale * 50)} y={(PT + dH) % (scale * 50)}>
-          <path d={`M ${scale * 50} 0 L 0 0 0 ${scale * 50}`}
+        <pattern id="gw-grid" width={Math.max(10, scale * 50)} height={Math.max(10, scale * 50)}
+          patternUnits="userSpaceOnUse" x={PL} y={PT}>
+          <path d={`M ${Math.max(10, scale * 50)} 0 L 0 0 0 ${Math.max(10, scale * 50)}`}
             fill="none" stroke="#2e2a1e" strokeWidth="0.5" />
         </pattern>
       </defs>
       <rect x={PL} y={PT} width={dW} height={dH} fill="url(#gw-grid)" rx="4" />
 
-      {/* Reference lines (dashed) */}
-      <line x1={Ax} y1={Ay} x2={Cx} y2={Cy} stroke="#504840" strokeWidth="1" strokeDasharray="5 3" />
-      <line x1={Bx} y1={By} x2={Cx} y2={Cy} stroke="#504840" strokeWidth="1" strokeDasharray="5 3" />
+      {/* Referenzlinien (gestrichelt) */}
+      <line x1={sx(0)} y1={sy(0)}      x2={Cx} y2={Cy} stroke="#504840" strokeWidth="1" strokeDasharray="5 3" />
+      <line x1={sx(0)} y1={sy(hvorne)} x2={Cx} y2={Cy} stroke="#504840" strokeWidth="1" strokeDasharray="5 3" />
 
-      {/* Hauptdachholz (oak, lies on main roof) */}
-      <line x1={HauptStartX} y1={HauptStartY} x2={Cx} y2={Cy}
+      {/* Hauptdachholz — liegt auf der Hauptdachfläche, läuft von Vorderholz zum First */}
+      <line x1={HauptX1} y1={HauptY1} x2={HauptX2} y2={HauptY2}
         stroke="#c9924a" strokeWidth={beamPx} strokeLinecap="square" />
 
-      {/* Gaubendachholz (oak, along dormer roof) */}
-      <line x1={Bx} y1={By} x2={Cx} y2={Cy}
+      {/* Gaubenholz — liegt oben, vom Eckständer bis zum First */}
+      <line x1={GaubeX1} y1={GaubeY1} x2={GaubeX2} y2={GaubeY2}
         stroke="#c9924a" strokeWidth={beamPx} strokeLinecap="square" />
 
-      {/* Lothölzer (steel, vertical posts) */}
+      {/* Lothölzer — zwischen Oberkante Hauptdach und Unterkante Gaubenholz */}
       {lothölzer.map((lot) => {
-        const yBot = lot.abstand * Math.tan(alphaRad);
-        const yTop = hvorne + lot.abstand * Math.tan(gammaRad);
+        const yBotLot = sy(lot.abstand * Math.tan(alphaRad) + dHaupt);          // Oberkante Hauptdachholz
+        const yTopLot = sy(hvorne + lot.abstand * Math.tan(gammaRad) - dGaube); // Unterkante Gaubenholz
         return (
           <line key={lot.nr}
-            x1={sx(lot.abstand)} y1={sy(yBot)}
-            x2={sx(lot.abstand)} y2={sy(yTop)}
+            x1={sx(lot.abstand)} y1={yBotLot}
+            x2={sx(lot.abstand)} y2={yTopLot}
             stroke="#6fa8d4" strokeWidth={beamPx} strokeLinecap="square"
           />
         );
       })}
 
-      {/* Vorderholz (pine, vertical at front) */}
-      <line x1={Ax} y1={Ay} x2={Bx} y2={By}
+      {/* Eckständer (Vorderholz) — zwischen den beiden Haupthölzern */}
+      <line x1={sx(0)} y1={EckFussY} x2={sx(0)} y2={EckKopfY}
         stroke="#7fb87a" strokeWidth={beamPx} strokeLinecap="square" />
 
-      {/* Dimension: h_vorne (left arrow) */}
-      <line x1={Ax - 18} y1={Ay} x2={Ax - 18} y2={By} stroke="#d47070" strokeWidth="1.5" markerEnd="url(#arr)" />
-      <line x1={Ax - 23} y1={Ay} x2={Ax - 13} y2={Ay} stroke="#d47070" strokeWidth="1.5" />
-      <line x1={Ax - 23} y1={By} x2={Ax - 13} y2={By} stroke="#d47070" strokeWidth="1.5" />
-      <text x={Ax - 22} y={(Ay + By) / 2 + 4} fill="#d47070" fontSize="9" textAnchor="middle"
-        transform={`rotate(-90,${Ax - 22},${(Ay + By) / 2})`}>
+      {/* Bemaßung: Eckhöhe vorne (links) */}
+      <line x1={sx(0) - 20} y1={sy(0)}      x2={sx(0) - 20} y2={sy(hvorne)} stroke="#d47070" strokeWidth="1.5" />
+      <line x1={sx(0) - 25} y1={sy(0)}      x2={sx(0) - 15} y2={sy(0)}      stroke="#d47070" strokeWidth="1.5" />
+      <line x1={sx(0) - 25} y1={sy(hvorne)} x2={sx(0) - 15} y2={sy(hvorne)} stroke="#d47070" strokeWidth="1.5" />
+      <text x={sx(0) - 22} y={(sy(0) + sy(hvorne)) / 2 + 4} fill="#d47070" fontSize="9" textAnchor="middle"
+        transform={`rotate(-90,${sx(0) - 22},${(sy(0) + sy(hvorne)) / 2})`}>
         {fmt(hvorne)} cm
       </text>
 
-      {/* Dimension: T (bottom arrow) */}
-      {Ay + 28 < H && (
+      {/* Bemaßung: Tiefe T (unten) */}
+      {sy(0) + 28 < H && (
         <>
-          <line x1={Ax} y1={Ay + 22} x2={Cx} y2={Ay + 22} stroke="#d47070" strokeWidth="1.5" />
-          <line x1={Ax} y1={Ay + 17} x2={Ax} y2={Ay + 27} stroke="#d47070" strokeWidth="1.5" />
-          <line x1={Cx} y1={Ay + 17} x2={Cx} y2={Ay + 27} stroke="#d47070" strokeWidth="1.5" />
-          <text x={(Ax + Cx) / 2} y={Ay + 36} fill="#d47070" fontSize="9" textAnchor="middle">
+          <line x1={sx(0)} y1={sy(0) + 22} x2={Cx}    y2={sy(0) + 22} stroke="#d47070" strokeWidth="1.5" />
+          <line x1={sx(0)} y1={sy(0) + 17} x2={sx(0)} y2={sy(0) + 27} stroke="#d47070" strokeWidth="1.5" />
+          <line x1={Cx}    y1={sy(0) + 17} x2={Cx}    y2={sy(0) + 27} stroke="#d47070" strokeWidth="1.5" />
+          <text x={(sx(0) + Cx) / 2} y={sy(0) + 36} fill="#d47070" fontSize="9" textAnchor="middle">
             T = {fmt(T)} cm
           </text>
         </>
       )}
 
-      {/* Angle labels */}
-      <text x={Ax + 6} y={Ay - 5} fill="#c9924a" fontSize="10" fontWeight="600">α={alphaDeg}°</text>
-      <text x={Bx + 6} y={By + 14} fill="#c9924a" fontSize="10" fontWeight="600">γ={gammaDeg}°</text>
+      {/* Winkel-Labels */}
+      <text x={sx(0) + 6} y={sy(0) - 5}      fill="#c9924a" fontSize="10" fontWeight="600">α={alphaDeg}°</text>
+      <text x={sx(0) + 6} y={sy(hvorne) + 14} fill="#c9924a" fontSize="10" fontWeight="600">γ={gammaDeg}°</text>
 
-      {/* Lotholz height labels (first and last) */}
-      {lothölzer.length > 0 && (() => {
-        const first = lothölzer[0];
-        return (
-          <text x={sx(first.abstand) + 4} y={(sy(first.abstand * Math.tan(alphaRad)) + sy(hvorne + first.abstand * Math.tan(gammaRad))) / 2}
-            fill="#6fa8d4" fontSize="9" dominantBaseline="middle">
-            {fmt(round1(first.hoehe))}
-          </text>
-        );
-      })()}
-
-      {/* Legend */}
+      {/* Legende */}
       <g transform={`translate(${PL}, ${H - 14})`}>
-        <line x1="0" y1="0" x2="14" y2="0" stroke="#7fb87a" strokeWidth="3" />
-        <text x="18" y="4" fill="#7fb87a" fontSize="9">Vorderholz</text>
-        <line x1="78" y1="0" x2="92" y2="0" stroke="#c9924a" strokeWidth="3" />
-        <text x="96" y="4" fill="#c9924a" fontSize="9">Gaubendach / Hauptdach</text>
+        <line x1="0"   y1="0" x2="14"  y2="0" stroke="#7fb87a" strokeWidth="3" />
+        <text x="18"  y="4" fill="#7fb87a" fontSize="9">Eckständer</text>
+        <line x1="78"  y1="0" x2="92"  y2="0" stroke="#c9924a" strokeWidth="3" />
+        <text x="96"  y="4" fill="#c9924a" fontSize="9">Gaubendach / Hauptdach</text>
         <line x1="220" y1="0" x2="234" y2="0" stroke="#6fa8d4" strokeWidth="3" />
         <text x="238" y="4" fill="#6fa8d4" fontSize="9">Lothölzer</text>
       </g>
