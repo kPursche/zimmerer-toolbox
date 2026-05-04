@@ -210,9 +210,9 @@ export function GauenwangenTool() {
       {/* ── Ergebnisse ── */}
       {erg && (
         <>
-          {/* Seitenansicht */}
-          <Card>
-            <CardHeader className="pb-3">
+          {/* Seitenansicht – auf Mobile volle Displaybreite */}
+          <Card className="-mx-4 rounded-none border-x-0 sm:mx-0 sm:rounded-xl sm:border-x">
+            <CardHeader className="px-4 pb-3 sm:px-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base">Seitenansicht (maßstabsgetreu)</CardTitle>
                 <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
