@@ -383,7 +383,7 @@ function SeitenansichtSVG({
   b: number; t: number;
   lothölzer: Lotholz[];
 }) {
-  const W = 560; const H = 300;
+  const W = 560; const H = 420;
   const PL = 55; const PR = 20; const PT = 24; const PB = 42;
   const dW = W - PL - PR;
   const dH = H - PT - PB;
