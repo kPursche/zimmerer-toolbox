@@ -337,6 +337,8 @@ export function GauenwangenTool() {
                     L_eckstaender={erg.L_eckstaender}
                     T={erg.T}
                     b={p.b}
+                    alpha={p.alpha}
+                    gamma={p.gamma}
                   />
                   <LotholzTabelle lothölzer={erg.lothölzer} alpha={p.alpha} gamma={p.gamma} />
                 </div>
@@ -464,89 +466,106 @@ function LotholzTabelle({ lothölzer, alpha, gamma }: {
   );
 }
 
-function GaubenwangeSkizze({ lothölzer, L_eckstaender, T, b }: {
-  lothölzer: Lotholz[]; L_eckstaender: number; T: number; b: number;
+function GaubenwangeSkizze({
+  lothölzer, L_eckstaender, T, b, alpha, gamma,
+}: {
+  lothölzer: Lotholz[]; L_eckstaender: number;
+  T: number; b: number; alpha: number; gamma: number;
 }) {
   const W = 300;
-  const lP = 18; const rP = 18;
+  const lP = 30; const rP = 16;
+  const tP = 10; const sh = 70;
   const sw = W - lP - rP;
+
+  const tanA = Math.tan(toRad(alpha));
+  const tanG = Math.tan(toRad(gamma));
+  const cosA = Math.cos(toRad(alpha));
+  const cosG = Math.cos(toRad(gamma));
+
+  // Hauptdach steigt an — maxY immer T·tanα (der Firstpunkt ist der höchste)
+  const maxY = T * tanA;
   const scaleX = sw / T;
-  const yBase = 62; const yTop = 8;
-  const scaleY = (yBase - yTop) / L_eckstaender;
+  const scaleY = sh / maxY;
 
-  const sx = (x: number) => lP + x * scaleX;
-  const sy = (h: number) => yBase - h * scaleY;
+  const yBase = tP + sh; // SVG-y der Vorderkante unten
+  const rx = (x: number) => lP + x * scaleX;
+  const ry = (y: number) => yBase - y * scaleY;
 
-  const profilePts: [number, number][] = [
-    [0, L_eckstaender],
-    ...lothölzer.map((l): [number, number] => [l.abstand, l.hoehe]),
-    [T, 0],
-  ];
+  const vkTopY = ry(L_eckstaender); // Eckständer oben
+  const firstX = rx(T);
+  const firstY = ry(maxY); // = tP (Firstpunkt oben)
 
-  const allX = [0, ...lothölzer.map((l) => l.abstand)];
-  const dimY = yBase + 18;
-  const dc = "rgba(255,255,255,0.2)";
-  const dt = "rgba(255,255,255,0.4)";
+  // Senkrechte auf die HD-Linie (zeigt nach unten/außen)
+  const hdSx = scaleX; const hdSy = -tanA * scaleY;
+  const hdLen = Math.sqrt(hdSx ** 2 + hdSy ** 2);
+  const hdPx = -hdSy / hdLen; const hdPy = hdSx / hdLen; // nach unten in SVG
+
+  // Senkrechte auf die GD-Linie (zeigt nach oben/außen)
+  const gdSx = firstX - rx(0); const gdSy = firstY - vkTopY;
+  const gdLen = Math.sqrt(gdSx ** 2 + gdSy ** 2);
+  const gdPx = gdSy / gdLen; const gdPy = -gdSx / gdLen; // nach oben in SVG
+
+  const tickLen = 5;
+  const svgH = tP + sh + 42;
 
   return (
-    <svg viewBox={`0 0 ${W} 88`} className="w-full overflow-visible">
-      {/* Baseline (Hauptdach) */}
-      <line x1={lP} y1={yBase} x2={sx(T)} y2={yBase} stroke="#504840" strokeWidth="1.2" />
-      <line x1={lP}    y1={yBase - 3} x2={lP}    y2={yBase + 3} stroke="#504840" strokeWidth="1" />
-      <line x1={sx(T)} y1={yBase - 3} x2={sx(T)} y2={yBase + 3} stroke="#504840" strokeWidth="1" />
-      <text x={lP}    y={yBase + 11} fontSize="7.5" fill="#504840" textAnchor="middle">VK</text>
-      <text x={sx(T)} y={yBase + 11} fontSize="7.5" fill="#504840" textAnchor="middle">F</text>
-
-      {/* Gaubendach-Profil gestrichelt */}
-      <polyline
-        points={profilePts.map(([x, h]) => `${sx(x)},${sy(h)}`).join(" ")}
-        fill="none" stroke="rgba(201,146,74,0.45)" strokeWidth="1" strokeDasharray="4 2"
-      />
-
+    <svg viewBox={`0 0 ${W} ${svgH}`} className="w-full overflow-visible">
+      {/* Hauptdach-Linie (Innenfläche) */}
+      <line x1={rx(0)} y1={yBase} x2={firstX} y2={firstY} stroke="#c9924a" strokeWidth="1.5" />
+      {/* Gaubendach-Linie (gestrichelt, Innenfläche) */}
+      <line x1={rx(0)} y1={vkTopY} x2={firstX} y2={firstY} stroke="#c9924a" strokeWidth="1.5" strokeDasharray="5 2" />
       {/* Eckständer */}
-      <rect
-        x={lP} y={sy(L_eckstaender)}
-        width={Math.max(scaleX * b, 3)} height={L_eckstaender * scaleY}
-        fill="#7fb87a" fillOpacity="0.75" rx="1"
-      />
-      <text x={lP + Math.max(scaleX * b, 3) / 2} y={sy(L_eckstaender) - 3}
-        fontSize="7" fill="#7fb87a" textAnchor="middle">
-        {fmt(round1(L_eckstaender))} cm
-      </text>
+      <line x1={rx(0)} y1={yBase} x2={rx(0)} y2={vkTopY} stroke="#7fb87a" strokeWidth="3" />
 
-      {/* Lothölzer */}
+      {/* Beschriftungen Outline */}
+      <text x={rx(0) - 4} y={(yBase + vkTopY) / 2} fontSize="7" fill="#7fb87a"
+        textAnchor="end" dominantBaseline="middle">{fmt(round1(L_eckstaender))} cm</text>
+      <text x={rx(0)} y={yBase + 9} fontSize="7" fill="#504840" textAnchor="middle">VK</text>
+      <text x={firstX + 3} y={firstY + 1} fontSize="7" fill="#504840" dominantBaseline="middle">F</text>
+      <text x={rx(0) + 6} y={yBase - 4} fontSize="6.5" fill="rgba(201,146,74,0.7)">α {alpha}°</text>
+      <text x={rx(0) + 6} y={vkTopY - 4} fontSize="6.5" fill="rgba(201,146,74,0.7)">γ {gamma}°</text>
+
+      {/* Gaubenständer */}
       {lothölzer.map((lot) => {
-        const xi = sx(lot.abstand);
-        const bw = Math.max(scaleX * b * 0.7, 2.5);
+        const x = lot.abstand;
+        const svgX = rx(x);
+        const botY = ry(x * tanA);            // Auflagepunkt auf HD-Fläche
+        const topY = ry(L_eckstaender + x * tanG); // Auflagepunkt auf GD-Fläche
+        const anschHD = fmt(round1(x / cosA));
+        const anschGD = fmt(round1(x / cosG));
+
         return (
           <g key={lot.nr}>
-            <rect x={xi - bw / 2} y={sy(lot.hoehe)} width={bw} height={lot.hoehe * scaleY}
-              fill="#6fa8d4" fillOpacity="0.75" rx="1" />
-            <text x={xi} y={sy(lot.hoehe) - 3} fontSize="7" fill="#6fa8d4" textAnchor="middle">
+            {/* Lotrechter Balken */}
+            <line x1={svgX} y1={botY} x2={svgX} y2={topY} stroke="#6fa8d4" strokeWidth="1.5" />
+            {/* Höhenmaß rechts des Balkens */}
+            <text x={svgX + 3} y={(botY + topY) / 2} fontSize="6.5" fill="#6fa8d4" dominantBaseline="middle">
               {fmt(round1(lot.hoehe))} cm
             </text>
-            <text x={xi} y={yBase + 11} fontSize="7" fill="#6fa8d4" textAnchor="middle" fontWeight="700">
-              {lot.nr}
-            </text>
+
+            {/* Tick auf HD-Linie */}
+            <line
+              x1={svgX - hdPx * tickLen} y1={botY - hdPy * tickLen}
+              x2={svgX + hdPx * tickLen} y2={botY + hdPy * tickLen}
+              stroke="#c9924a" strokeWidth="1"
+            />
+            {/* Tick auf GD-Linie */}
+            <line
+              x1={svgX - gdPx * tickLen} y1={topY - gdPy * tickLen}
+              x2={svgX + gdPx * tickLen} y2={topY + gdPy * tickLen}
+              stroke="#c9924a" strokeWidth="1" strokeDasharray="2 1"
+            />
+
+            {/* Anschlag-Maße unterhalb der Skizze */}
+            <text x={svgX} y={yBase + 20} fontSize="7" fill="#c9924a" textAnchor="middle">{anschHD} cm</text>
+            <text x={svgX} y={yBase + 32} fontSize="7" fill="rgba(201,146,74,0.65)" textAnchor="middle">{anschGD} cm</text>
           </g>
         );
       })}
 
-      {/* Abstandsmaße zwischen den Ständern */}
-      {allX.map((x, i) => {
-        if (i === allX.length - 1) return null;
-        const x1 = sx(x); const x2 = sx(allX[i + 1]);
-        const mid = (x1 + x2) / 2;
-        const spacing = fmt(round1(allX[i + 1] - x));
-        return (
-          <g key={i}>
-            <line x1={x1} y1={dimY} x2={x2} y2={dimY} stroke={dc} strokeWidth="0.8" />
-            <line x1={x1} y1={dimY - 2} x2={x1} y2={dimY + 2} stroke={dc} strokeWidth="0.8" />
-            <line x1={x2} y1={dimY - 2} x2={x2} y2={dimY + 2} stroke={dc} strokeWidth="0.8" />
-            <text x={mid} y={dimY + 9} fontSize="7" fill={dt} textAnchor="middle">{spacing} cm</text>
-          </g>
-        );
-      })}
+      {/* Zeilen-Labels links */}
+      <text x={lP - 4} y={yBase + 20} fontSize="6.5" fill="#504840" textAnchor="end" dominantBaseline="middle">HD:</text>
+      <text x={lP - 4} y={yBase + 32} fontSize="6.5" fill="#504840" textAnchor="end" dominantBaseline="middle">GD:</text>
     </svg>
   );
 }
