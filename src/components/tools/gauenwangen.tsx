@@ -255,6 +255,8 @@ export function GauenwangenTool() {
                   hauptVers:    p.b * Math.tan(toRad(p.alpha)),
                   mitte:        erg.L_eckstaender - p.b * Math.tan(toRad(p.alpha)) - p.b * Math.tan(toRad(p.gamma)),
                   gaubeVers:    p.b * Math.tan(toRad(p.gamma)),
+                  gesamtlaengePrefix: "x = ",
+                  mittePrefix:        "y = ",
                 }}
               />
               <HolzSchematik
@@ -284,7 +286,17 @@ export function GauenwangenTool() {
                   mitte:        erg.L_gaubendach - p.b * Math.tan(toRad(p.gamma)) - p.b / Math.tan(toRad(erg.schnittFirst)),
                 }}
               />
-              {/* Zwischenhölzer — Positionsstreifen und Maßtabelle */}
+              {erg.lothölzer.length > 0 && (
+                <GaubenwangeSkizze
+                  lothölzer={erg.lothölzer}
+                  L_eckstaender={erg.L_eckstaender}
+                  T={erg.T}
+                  b={p.b}
+                  alpha={p.alpha}
+                  gamma={p.gamma}
+                />
+              )}
+              {/* Zwischenhölzer — Maßtabelle */}
               {erg.lothölzer.length > 0 && (
                 <div className="space-y-4 border-t border-border pt-4">
                   <div>
@@ -295,14 +307,6 @@ export function GauenwangenTool() {
                       Pos. = Abstand von Vorderkante entlang des Holzes
                     </p>
                   </div>
-                  <GaubenwangeSkizze
-                    lothölzer={erg.lothölzer}
-                    L_eckstaender={erg.L_eckstaender}
-                    T={erg.T}
-                    b={p.b}
-                    alpha={p.alpha}
-                    gamma={p.gamma}
-                  />
                   <LotholzTabelle lothölzer={erg.lothölzer} alpha={p.alpha} gamma={p.gamma} />
                 </div>
               )}
@@ -374,6 +378,8 @@ interface DimLinien {
   hauptVers: number;     // untere Teilmaßlinie links  = b·tan α
   mitte: number;         // untere Teilmaßlinie Mitte
   gaubeVers: number;     // untere Teilmaßlinie rechts = b·tan γ
+  gesamtlaengePrefix?: string; // optionales Kürzel vor dem Maß, z.B. "x = "
+  mittePrefix?: string;        // optionales Kürzel vor dem Mittelmaß, z.B. "y = "
 }
 
 function DimSeg({ x1, x2, y, label, above }: {
@@ -601,11 +607,11 @@ function HolzSchematik({
             <line x1={W}       y1={rechtsGekippt ? Yoff : Yoff + Ht} x2={W}       y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
 
             {/* Oben: Gesamtlänge (Spitze–Spitze) */}
-            <DimSeg x1={0} x2={W} y={dimAboveY} label={`${fmt(dimGL / 10)} cm`} above={true} />
+            <DimSeg x1={0} x2={W} y={dimAboveY} label={`${dimLinien.gesamtlaengePrefix ?? ""}${fmt(dimGL / 10)} cm`} above={true} />
 
             {/* Unten: dreiteilige Maßkette */}
             <DimSeg x1={0}       x2={ohL}     y={dimBelowY} label={`↕ ${fmt(dimHV / 10)} cm`}  above={false} />
-            <DimSeg x1={ohL}     x2={W - ohR} y={dimBelowY} label={`${fmt(dimMi / 10)} cm`}         above={false} />
+            <DimSeg x1={ohL}     x2={W - ohR} y={dimBelowY} label={`${dimLinien.mittePrefix ?? ""}${fmt(dimMi / 10)} cm`}  above={false} />
             <DimSeg x1={W - ohR} x2={W}       y={dimBelowY} label={`↕ ${fmt(dimGV / 10)} cm`}  above={false} />
           </>
         )}
