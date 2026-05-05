@@ -412,24 +412,24 @@ function LotholzTabelle({ lothölzer, alpha, gamma, b }: {
         <thead>
           <tr className="border-b border-border text-left">
             <th className="pb-2 font-semibold text-tx">Nr.</th>
-            <th className="pb-2 text-right font-semibold text-tx">Höhe x</th>
-            <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag HD</th>
-            <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag GD</th>
+            <th className="pb-2 text-right font-semibold text-tx">Höhe x<br /><span className="font-normal text-mu">cm</span></th>
+            <th className="pb-2 text-right text-xs font-semibold text-mu">Bundmaß<br />HD cm</th>
+            <th className="pb-2 text-right text-xs font-semibold text-mu">Bundmaß<br />GD cm</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {lothölzer.map((lot) => (
             <tr key={lot.nr}>
               <td className="py-2.5 text-mu">{lot.nr}</td>
-              <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))} cm</td>
-              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosA))} cm</td>
-              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosG))} cm</td>
+              <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))}</td>
+              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosA))}</td>
+              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosG))}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <p className="mt-1.5 text-[10px] text-dm">
-        Höhe x = Gesamtlänge · Anschlag = Abstand von VK entlang des Holzes
+        Höhe x = Gesamtlänge · Bundmaß = Abstand von VK entlang des Holzes
       </p>
     </div>
   );
