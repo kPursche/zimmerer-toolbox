@@ -274,54 +274,11 @@ export function GauenwangenTool() {
             </CardContent>
           </Card>
 
-          {/* Lothölzer */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">
-                Lothölzer ({erg.lothölzer.length} Stk.)
-              </CardTitle>
-              <CardDescription>
-                Unterer Schnitt: {fmt(round1(p.alpha))}° (Hauptdach-Schmiege) ·{" "}
-                Oberer Schnitt: {fmt(round1(p.gamma))}° (Gaubendach-Schmiege)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[280px] text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-2 font-semibold text-tx">Nr.</th>
-                      <th className="pb-2 text-right font-semibold text-tx">Abst. v. Vorderkante</th>
-                      <th className="pb-2 text-right font-semibold text-tx">Länge (lotrecht)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {erg.lothölzer.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="py-4 text-center text-mu">
-                          Kein Lothölzer — Achsabstand größer als Tiefe
-                        </td>
-                      </tr>
-                    ) : (
-                      erg.lothölzer.map((lot) => (
-                        <tr key={lot.nr}>
-                          <td className="py-2.5 text-mu">{lot.nr}</td>
-                          <td className="py-2.5 text-right tabular-nums text-tx">{fmt(lot.abstand)} cm</td>
-                          <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))} cm</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Zuschnittansicht */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Zuschnittansicht</CardTitle>
-              <CardDescription>Schematisch — Schmiegen und Verstichmass</CardDescription>
+              <CardDescription>Schematisch — Schmiegen, Maße und Zwischenhölzer</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <HolzSchematik
@@ -343,7 +300,7 @@ export function GauenwangenTool() {
                 laenge={erg.L_hauptdach}
                 farbe="#c9924a"
                 links={{ label: "Fußschnitt", anzeigeGrad: round1(90 - p.alpha), zeichenGrad: p.alpha }}
-                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst, verstichmass: true }}
+                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst }}
                 dimLinien={{
                   gesamtlaenge: erg.L_hauptdach,
                   hauptVers:    p.b * Math.tan(toRad(p.alpha)),
@@ -356,7 +313,7 @@ export function GauenwangenTool() {
                 laenge={erg.L_gaubendach}
                 farbe="#c9924a"
                 links={{ label: "Vorschnitt", anzeigeGrad: round1(90 - p.gamma), zeichenGrad: p.gamma }}
-                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst, verstichmass: true }}
+                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst }}
                 linksGekippt
                 dimLinien={{
                   gesamtlaenge: erg.L_gaubendach,
@@ -365,6 +322,27 @@ export function GauenwangenTool() {
                   mitte:        erg.L_gaubendach - p.b * Math.tan(toRad(p.gamma)) - p.b / Math.tan(toRad(erg.schnittFirst)),
                 }}
               />
+              {/* Zwischenhölzer — Positionsstreifen und Maßtabelle */}
+              {erg.lothölzer.length > 0 && (
+                <div className="space-y-4 border-t border-border pt-4">
+                  <div>
+                    <p className="text-sm font-semibold text-tx">
+                      Zwischenhölzer ({erg.lothölzer.length} Stk.) · u {fmt(round1(p.alpha))}° / o {fmt(round1(p.gamma))}°
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-mu">
+                      Pos. = Abstand von Vorderkante entlang des Holzes
+                    </p>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-dm">Option B — Positionsstreifen</p>
+                    <LotholzStreifen lothölzer={erg.lothölzer} T={erg.T} b={p.b} />
+                  </div>
+                  <div>
+                    <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-dm">Option A — Maßtabelle</p>
+                    <LotholzTabelle lothölzer={erg.lothölzer} alpha={p.alpha} gamma={p.gamma} />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>
@@ -450,6 +428,80 @@ function DimSeg({ x1, x2, y, label, above }: {
       <line x1={x2} y1={y - tH} x2={x2} y2={y + tH} stroke={c} strokeWidth="0.8" />
       <text x={mid} y={textY} textAnchor="middle" fontSize="8.5" fill={ct}>{label}</text>
     </g>
+  );
+}
+
+function LotholzStreifen({ lothölzer, T, b }: {
+  lothölzer: Lotholz[]; T: number; b: number;
+}) {
+  const W = 300;
+  const lP = 22; const rP = 22;
+  const uw = W - lP - rP;
+  const scl = uw / T;
+  const bkTop = 20; const bkH = 20; const bkBot = bkTop + bkH;
+
+  return (
+    <svg viewBox={`0 0 ${W} 62`} className="w-full overflow-visible">
+      {/* Baseline */}
+      <line x1={lP} y1={bkBot} x2={W - rP} y2={bkBot} stroke="#2e2a1e" strokeWidth="1.5" />
+      {/* End markers */}
+      <line x1={lP}     y1={bkTop} x2={lP}     y2={bkBot + 3} stroke="#504840" strokeWidth="1" />
+      <line x1={W - rP} y1={bkTop} x2={W - rP} y2={bkBot + 3} stroke="#504840" strokeWidth="1" />
+      {/* VK / F labels beside baseline */}
+      <text x={lP - 3} y={bkBot + 2} fontSize="7.5" fill="#504840" textAnchor="end" dominantBaseline="middle">VK</text>
+      <text x={W - rP + 3} y={bkBot + 2} fontSize="7.5" fill="#504840" textAnchor="start" dominantBaseline="middle">F</text>
+      {/* Eckständer block */}
+      <rect x={lP} y={bkTop} width={Math.max(scl * b, 4)} height={bkH} fill="#7fb87a" fillOpacity="0.8" rx="1" />
+      {/* Lotholz ticks */}
+      {lothölzer.map((lot) => {
+        const xi = lP + scl * lot.abstand;
+        return (
+          <g key={lot.nr}>
+            <line x1={xi} y1={bkTop - 7} x2={xi} y2={bkBot + 3} stroke="#6fa8d4" strokeWidth="1.5" />
+            <text x={xi} y={bkTop - 10} fontSize="8" fill="#6fa8d4" textAnchor="middle" fontWeight="700">
+              {lot.nr}
+            </text>
+            <text x={xi} y={bkBot + 13} fontSize="8" fill="#6fa8d4" textAnchor="middle">
+              {fmt(round1(lot.hoehe))} cm
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function LotholzTabelle({ lothölzer, alpha, gamma }: {
+  lothölzer: Lotholz[]; alpha: number; gamma: number;
+}) {
+  const cosA = Math.cos(toRad(alpha));
+  const cosG = Math.cos(toRad(gamma));
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[300px] text-sm">
+        <thead>
+          <tr className="border-b border-border text-left">
+            <th className="pb-2 font-semibold text-tx">Nr.</th>
+            <th className="pb-2 text-right font-semibold text-tx">Länge</th>
+            <th className="pb-2 text-right text-xs font-semibold text-mu">Pos. Hauptdach</th>
+            <th className="pb-2 text-right text-xs font-semibold text-mu">Pos. Gaubendach</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {lothölzer.map((lot) => (
+            <tr key={lot.nr}>
+              <td className="py-2.5 text-mu">{lot.nr}</td>
+              <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))} cm</td>
+              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosA))} cm</td>
+              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosG))} cm</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1.5 text-[10px] text-dm">
+        Pos. Hauptdach = entlang Holz von VK / Pos. Gaubendach = entlang Holz von VK
+      </p>
+    </div>
   );
 }
 
