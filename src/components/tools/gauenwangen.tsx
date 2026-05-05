@@ -412,7 +412,7 @@ function LotholzTabelle({ lothölzer, alpha, gamma }: {
         <thead>
           <tr className="border-b border-border text-left">
             <th className="pb-2 font-semibold text-tx">Nr.</th>
-            <th className="pb-2 text-right font-semibold text-tx">Höhe (lotrecht)</th>
+            <th className="pb-2 text-right font-semibold text-tx">Höhe x</th>
             <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag Hauptdach</th>
             <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag Gaubendach</th>
           </tr>
