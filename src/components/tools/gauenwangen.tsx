@@ -15,6 +15,7 @@ import {
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 const fmt   = (v: number, dec = 1) => v.toFixed(dec);
 const round1 = (v: number) => Math.round(v * 10) / 10;
+const verstichmass = (deg: number) => (10 * Math.tan(toRad(deg))).toFixed(1);
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
@@ -315,6 +316,37 @@ export function GauenwangenTool() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Zuschnittansicht */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Zuschnittansicht</CardTitle>
+              <CardDescription>Schematisch — Schmiegen und Verstichmass</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <HolzSchematik
+                name="Gaubeneckständer"
+                laenge={erg.L_eckstaender}
+                farbe="#7fb87a"
+                links={{ label: "Hauptdach-Schmiege", anzeigeGrad: round1(p.alpha), zeichenGrad: p.alpha }}
+                rechts={{ label: "Gaubendach-Schmiege", anzeigeGrad: round1(p.gamma), zeichenGrad: p.gamma }}
+              />
+              <HolzSchematik
+                name="Holz an Hauptdach"
+                laenge={erg.L_hauptdach}
+                farbe="#c9924a"
+                links={{ label: "Fußschnitt", anzeigeGrad: round1(90 - p.alpha), zeichenGrad: p.alpha }}
+                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: erg.schnittFirst, verstichmass: true }}
+              />
+              <HolzSchematik
+                name="Holz an Gaubendach"
+                laenge={erg.L_gaubendach}
+                farbe="#c9924a"
+                links={{ label: "Vorschnitt", anzeigeGrad: round1(90 - p.gamma), zeichenGrad: p.gamma }}
+                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: erg.schnittFirst, verstichmass: true }}
+              />
+            </CardContent>
+          </Card>
         </>
       )}
     </div>
@@ -364,6 +396,69 @@ function HkZeile({ name, laenge, schnitte }: { name: string; laenge: number; sch
       <td className="py-3 text-right tabular-nums font-bold text-oak">{fmt(round1(laenge))} cm</td>
       <td className="py-3 text-right text-xs text-mu">{schnitte}</td>
     </tr>
+  );
+}
+
+// ─── Zuschnittansicht ─────────────────────────────────────────────────────────
+
+interface SchnittInfo {
+  label: string;
+  anzeigeGrad: number;  // Winkel für Anzeige
+  zeichenGrad: number;  // Winkel vom Lot (für SVG-Überhang)
+  verstichmass?: boolean;
+}
+
+function HolzSchematik({
+  name, laenge, farbe, links, rechts,
+}: {
+  name: string; laenge: number; farbe: string;
+  links: SchnittInfo; rechts: SchnittInfo;
+}) {
+  const W = 300; const Ht = 40; const Yoff = 4;
+  const ohL = Math.min(Ht * Math.tan(toRad(links.zeichenGrad)), Ht);
+  const ohR = Math.min(Ht * Math.tan(toRad(rechts.zeichenGrad)), Ht);
+
+  // Polygon: oben-links, oben-rechts, unten-rechts, unten-links
+  const pts = [
+    `${ohL},${Yoff}`,
+    `${W - ohR},${Yoff}`,
+    `${W},${Yoff + Ht}`,
+    `0,${Yoff + Ht}`,
+  ].join(" ");
+
+  // Winkelindikator-Hilfslinie am linken Schnitt
+  const arcL = `M ${ohL},${Yoff} L 0,${Yoff + Ht} M ${ohL},${Yoff} L ${ohL},${Yoff + Ht}`;
+  const arcR = `M ${W - ohR},${Yoff} L ${W},${Yoff + Ht} M ${W - ohR},${Yoff} L ${W - ohR},${Yoff + Ht}`;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm font-semibold text-tx">{name}</span>
+        <span className="tabular-nums text-sm font-bold text-oak">{fmt(round1(laenge))} cm</span>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${Yoff + Ht + 2}`} className="w-full overflow-visible">
+        <polygon points={pts} fill={farbe} fillOpacity="0.85" stroke="none" />
+        <path d={arcL} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
+        <path d={arcR} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
+      </svg>
+
+      <div className="grid grid-cols-2 gap-1">
+        <div className="rounded-md bg-s2 px-3 py-2">
+          <div className="text-[10px] uppercase tracking-wide text-mu">{links.label}</div>
+          <div className="text-lg font-bold text-tx">{fmt(links.anzeigeGrad, 1)}°</div>
+        </div>
+        <div className="rounded-md bg-s2 px-3 py-2 text-right">
+          <div className="text-[10px] uppercase tracking-wide text-mu">{rechts.label}</div>
+          <div className="text-lg font-bold text-tx">{fmt(rechts.anzeigeGrad, 1)}°</div>
+          {rechts.verstichmass && (
+            <div className="text-xs font-semibold text-oak">
+              ↕ {verstichmass(rechts.anzeigeGrad)} cm / 10 cm
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
