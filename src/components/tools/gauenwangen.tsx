@@ -270,16 +270,6 @@ export function GauenwangenTool() {
                   mitte:        erg.L_gaubendach - p.b * Math.tan(toRad(p.gamma)) - p.b / Math.tan(toRad(erg.schnittFirst)),
                 }}
               />
-              {erg.lothölzer.length > 0 && (
-                <GaubenwangeSkizze
-                  lothölzer={erg.lothölzer}
-                  L_eckstaender={erg.L_eckstaender}
-                  T={erg.T}
-                  b={p.b}
-                  alpha={p.alpha}
-                  gamma={p.gamma}
-                />
-              )}
               <HolzSchematik
                 name="Gaubeneckständer"
                 laenge={erg.L_eckstaender}
@@ -296,6 +286,16 @@ export function GauenwangenTool() {
                   mittePrefix:        "y = ",
                 }}
               />
+              {erg.lothölzer.length > 0 && (
+                <GaubenwangeSkizze
+                  lothölzer={erg.lothölzer}
+                  L_eckstaender={erg.L_eckstaender}
+                  T={erg.T}
+                  b={p.b}
+                  alpha={p.alpha}
+                  gamma={p.gamma}
+                />
+              )}
               {/* Zwischenhölzer — Maßtabelle */}
               {erg.lothölzer.length > 0 && (
                 <div className="space-y-4 border-t border-border pt-4">
@@ -406,37 +406,30 @@ function LotholzTabelle({ lothölzer, alpha, gamma, b }: {
 }) {
   const cosA = Math.cos(toRad(alpha));
   const cosG = Math.cos(toRad(gamma));
-  const schmiegeA = b * Math.tan(toRad(alpha));
-  const schmiegeG = b * Math.tan(toRad(gamma));
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[340px] text-sm">
+      <table className="w-full min-w-[300px] text-sm">
         <thead>
           <tr className="border-b border-border text-left">
             <th className="pb-2 font-semibold text-tx">Nr.</th>
             <th className="pb-2 text-right font-semibold text-tx">Höhe x</th>
-            <th className="pb-2 text-right font-semibold text-tx">Höhe y</th>
             <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag HD</th>
             <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag GD</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {lothölzer.map((lot) => {
-            const hoehey = lot.hoehe - schmiegeA - schmiegeG;
-            return (
-              <tr key={lot.nr}>
-                <td className="py-2.5 text-mu">{lot.nr}</td>
-                <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))} cm</td>
-                <td className="py-2.5 text-right tabular-nums font-bold text-pine">{fmt(round1(hoehey))} cm</td>
-                <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosA))} cm</td>
-                <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosG))} cm</td>
-              </tr>
-            );
-          })}
+          {lothölzer.map((lot) => (
+            <tr key={lot.nr}>
+              <td className="py-2.5 text-mu">{lot.nr}</td>
+              <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))} cm</td>
+              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosA))} cm</td>
+              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosG))} cm</td>
+            </tr>
+          ))}
         </tbody>
       </table>
       <p className="mt-1.5 text-[10px] text-dm">
-        x = Gesamtlänge · y = Mittelmaß (ohne Schmiegen) · Anschlag = Abstand von VK entlang des Holzes
+        Höhe x = Gesamtlänge · Anschlag = Abstand von VK entlang des Holzes
       </p>
     </div>
   );
