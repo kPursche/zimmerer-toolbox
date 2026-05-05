@@ -330,7 +330,13 @@ export function GauenwangenTool() {
                 farbe="#7fb87a"
                 links={{ label: "Hauptdach-Schmiege", anzeigeGrad: round1(p.alpha), zeichenGrad: p.alpha }}
                 rechts={{ label: "Gaubendach-Schmiege", anzeigeGrad: round1(p.gamma), zeichenGrad: p.gamma }}
-                rechtsGekippt
+                linksGekippt
+                dimLinien={{
+                  gesamtlaenge: erg.L_eckstaender,
+                  hauptVers:    p.b * Math.tan(toRad(p.alpha)),
+                  mitte:        erg.L_eckstaender - p.b * Math.tan(toRad(p.alpha)) - p.b * Math.tan(toRad(p.gamma)),
+                  gaubeVers:    p.b * Math.tan(toRad(p.gamma)),
+                }}
               />
               <HolzSchematik
                 name="Holz an Hauptdach"
@@ -345,8 +351,6 @@ export function GauenwangenTool() {
                 farbe="#c9924a"
                 links={{ label: "Vorschnitt", anzeigeGrad: round1(90 - p.gamma), zeichenGrad: p.gamma }}
                 rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst, verstichmass: true }}
-                linksGekippt
-                rechtsGekippt
               />
             </CardContent>
           </Card>
@@ -406,23 +410,49 @@ function HkZeile({ name, laenge, schnitte }: { name: string; laenge: number; sch
 
 interface SchnittInfo {
   label: string;
-  anzeigeGrad: number;  // Winkel für Anzeige
-  zeichenGrad: number;  // Winkel vom Lot (für SVG-Überhang)
+  anzeigeGrad: number;
+  zeichenGrad: number;
   verstichmass?: boolean;
 }
 
+interface DimLinien {
+  gesamtlaenge: number;  // obere Gesamtmaßlinie (Spitze–Spitze)
+  hauptVers: number;     // untere Teilmaßlinie links  = b·tan α
+  mitte: number;         // untere Teilmaßlinie Mitte
+  gaubeVers: number;     // untere Teilmaßlinie rechts = b·tan γ
+}
+
+function DimSeg({ x1, x2, y, label, above }: {
+  x1: number; x2: number; y: number; label: string; above: boolean;
+}) {
+  const mid = (x1 + x2) / 2;
+  const textY = above ? y - 4 : y + 9;
+  const c = "rgba(255,255,255,0.28)";
+  const ct = "rgba(255,255,255,0.55)";
+  const tH = 3;
+  return (
+    <g>
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke={c} strokeWidth="0.8" />
+      <line x1={x1} y1={y - tH} x2={x1} y2={y + tH} stroke={c} strokeWidth="0.8" />
+      <line x1={x2} y1={y - tH} x2={x2} y2={y + tH} stroke={c} strokeWidth="0.8" />
+      <text x={mid} y={textY} textAnchor="middle" fontSize="8.5" fill={ct}>{label}</text>
+    </g>
+  );
+}
+
 function HolzSchematik({
-  name, laenge, farbe, links, rechts, linksGekippt = false, rechtsGekippt = false,
+  name, laenge, farbe, links, rechts,
+  linksGekippt = false, rechtsGekippt = false, dimLinien,
 }: {
   name: string; laenge: number; farbe: string;
   links: SchnittInfo; rechts: SchnittInfo;
   linksGekippt?: boolean; rechtsGekippt?: boolean;
+  dimLinien?: DimLinien;
 }) {
   const W = 300; const Ht = 40; const Yoff = 4;
   const ohL = Math.min(Ht * Math.tan(toRad(links.zeichenGrad)), W / 2 - 5);
   const ohR = Math.min(Ht * Math.tan(toRad(rechts.zeichenGrad)), W / 2 - 5);
 
-  // Standard: Unterkante übersteht (Trapez). Gekippt: Oberkante übersteht.
   const TLx = linksGekippt ? 0 : ohL;
   const BLx = linksGekippt ? ohL : 0;
   const TRx = rechtsGekippt ? W : W - ohR;
@@ -430,13 +460,18 @@ function HolzSchematik({
 
   const pts = [`${TLx},${Yoff}`, `${TRx},${Yoff}`, `${BRx},${Yoff + Ht}`, `${BLx},${Yoff + Ht}`].join(" ");
 
-  // Winkelindikator: Schnittlinie + Lotlinie vom Inneneck
   const arcL = linksGekippt
     ? `M 0,${Yoff} L ${ohL},${Yoff + Ht} M ${ohL},${Yoff} L ${ohL},${Yoff + Ht}`
     : `M ${ohL},${Yoff} L 0,${Yoff + Ht} M ${ohL},${Yoff} L ${ohL},${Yoff + Ht}`;
   const arcR = rechtsGekippt
     ? `M ${W},${Yoff} L ${W - ohR},${Yoff + Ht} M ${W - ohR},${Yoff} L ${W - ohR},${Yoff + Ht}`
     : `M ${W - ohR},${Yoff} L ${W},${Yoff + Ht} M ${W - ohR},${Yoff} L ${W - ohR},${Yoff + Ht}`;
+
+  const extraTop = dimLinien ? 28 : 0;
+  const extraBot = dimLinien ? 26 : 0;
+  const dimAboveY = -12;
+  const dimBelowY = Yoff + Ht + 14;
+  const extC = "rgba(255,255,255,0.18)";
 
   return (
     <div className="space-y-2">
@@ -445,10 +480,34 @@ function HolzSchematik({
         <span className="tabular-nums text-sm font-bold text-oak">{fmt(round1(laenge))} cm</span>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${Yoff + Ht + 2}`} className="w-full overflow-visible">
+      <svg
+        viewBox={`0 ${-extraTop} ${W} ${Yoff + Ht + 2 + extraTop + extraBot}`}
+        className="w-full overflow-visible"
+      >
         <polygon points={pts} fill={farbe} fillOpacity="0.85" stroke="none" />
         <path d={arcL} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
         <path d={arcR} stroke="rgba(255,255,255,0.35)" strokeWidth="1" fill="none" />
+
+        {dimLinien && (
+          <>
+            {/* Verlängerungslinien oben */}
+            <line x1={0}   y1={Yoff} x2={0}   y2={dimAboveY + 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            <line x1={W}   y1={Yoff} x2={W}   y2={dimAboveY + 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            {/* Verlängerungslinien unten */}
+            <line x1={0}   y1={Yoff + Ht} x2={0}   y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            <line x1={ohL} y1={Yoff + Ht} x2={ohL} y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            <line x1={W - ohR} y1={Yoff}    x2={W - ohR} y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            <line x1={W}   y1={Yoff + Ht} x2={W}   y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+
+            {/* Oben: Gesamtlänge (Spitze–Spitze) */}
+            <DimSeg x1={0} x2={W} y={dimAboveY} label={`${fmt(round1(dimLinien.gesamtlaenge))} cm`} above={true} />
+
+            {/* Unten: dreiteilige Maßkette */}
+            <DimSeg x1={0}       x2={ohL}     y={dimBelowY} label={`↕ ${fmt(round1(dimLinien.hauptVers))} cm`}  above={false} />
+            <DimSeg x1={ohL}     x2={W - ohR} y={dimBelowY} label={`${fmt(round1(dimLinien.mitte))} cm`}         above={false} />
+            <DimSeg x1={W - ohR} x2={W}       y={dimBelowY} label={`↕ ${fmt(round1(dimLinien.gaubeVers))} cm`}  above={false} />
+          </>
+        )}
       </svg>
 
       <div className="grid grid-cols-2 gap-1">
@@ -461,7 +520,7 @@ function HolzSchematik({
           <div className="text-lg font-bold text-tx">{fmt(rechts.anzeigeGrad, 1)}°</div>
           {rechts.verstichmass && (
             <div className="text-xs font-semibold text-oak">
-              ↕ {verstichmass(rechts.anzeigeGrad)} cm / 10 cm
+              Stichmaß: {verstichmass(rechts.anzeigeGrad)} cm / 10 cm
             </div>
           )}
         </div>
