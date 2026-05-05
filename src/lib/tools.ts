@@ -14,9 +14,12 @@
 
 import {
   Calculator,
+  Car,
+  Columns2,
   type LucideIcon,
   Layers,
   Ruler,
+  Scroll,
   Triangle,
 } from "lucide-react";
 
@@ -52,6 +55,15 @@ export const TOOLS: Tool[] = [
     category: "Dach",
   },
   {
+    slug: "boden-deckelschalung",
+    name: "Boden-Deckelschalung",
+    description:
+      "Einteilung der Boden- und Deckbretter für eine gleichmäßige Schalung aus Gesamtbreite und Brettmaßen.",
+    icon: Columns2,
+    status: "coming-soon",
+    category: "Holz",
+  },
+  {
     slug: "plattenschmiegen",
     name: "Plattenschmiegen Kehle/Grat",
     description:
@@ -61,11 +73,29 @@ export const TOOLS: Tool[] = [
     category: "Dach",
   },
   {
+    slug: "carportplaner",
+    name: "Carportplaner",
+    description:
+      "Maße, Sparren- und Stützenplan für einen Carport aus Grundfläche und Dachneigung.",
+    icon: Car,
+    status: "coming-soon",
+    category: "Allgemein",
+  },
+  {
     slug: "rechner",
     name: "Universalrechner",
     description:
       "Klassischer Taschenrechner mit Winkel- und Trigonometriefunktionen.",
     icon: Calculator,
+    status: "coming-soon",
+    category: "Allgemein",
+  },
+  {
+    slug: "richtspruchgenerator",
+    name: "Richtspruchgenerator",
+    description:
+      "Klassische und moderne Richtsprüche für das Richtfest — passend zum Anlass.",
+    icon: Scroll,
     status: "coming-soon",
     category: "Allgemein",
   },
