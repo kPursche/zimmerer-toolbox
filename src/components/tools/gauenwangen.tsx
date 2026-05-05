@@ -235,43 +235,6 @@ export function GauenwangenTool() {
             </CardContent>
           </Card>
 
-          {/* Zuschnitte Hauptkanten */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Zuschnitte Hauptkanten</CardTitle>
-              <CardDescription>Querschnitt aller Hölzer: {p.b} × {p.t} cm</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[320px] text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-2 font-semibold text-tx">Holz</th>
-                      <th className="pb-2 text-right font-semibold text-tx">Länge</th>
-                      <th className="pb-2 text-right text-xs font-semibold text-mu">Schnitte</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    <HkZeile
-                      name="Gaubeneckständer (lotrecht)"
-                      laenge={erg.L_eckstaender}
-                      schnitte={`u ${fmt(round1(p.alpha))}° / o ${fmt(round1(p.gamma))}°`}
-                    />
-                    <HkZeile
-                      name="Holz an Gaubendach"
-                      laenge={erg.L_gaubendach}
-                      schnitte={`v ${fmt(round1(erg.schnittVorneGaube))}° / o ${fmt(round1(erg.schnittFirst))}°`}
-                    />
-                    <HkZeile
-                      name="Holz an Hauptdach"
-                      laenge={erg.L_hauptdach}
-                      schnitte={`v ${fmt(round1(90 - p.alpha))}° / o ${fmt(round1(erg.schnittFirst))}°`}
-                    />
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Zuschnittansicht */}
           <Card>
