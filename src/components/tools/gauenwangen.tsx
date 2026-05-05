@@ -406,30 +406,37 @@ function LotholzTabelle({ lothölzer, alpha, gamma, b }: {
 }) {
   const cosA = Math.cos(toRad(alpha));
   const cosG = Math.cos(toRad(gamma));
+  const schmiegeA = b * Math.tan(toRad(alpha));
+  const schmiegeG = b * Math.tan(toRad(gamma));
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[300px] text-sm">
+      <table className="w-full min-w-[340px] text-sm">
         <thead>
           <tr className="border-b border-border text-left">
             <th className="pb-2 font-semibold text-tx">Nr.</th>
             <th className="pb-2 text-right font-semibold text-tx">Höhe x<br /><span className="font-normal text-mu">cm</span></th>
+            <th className="pb-2 text-right font-semibold text-tx">Höhe y<br /><span className="font-normal text-mu">cm</span></th>
             <th className="pb-2 text-right text-xs font-semibold text-mu">Bundmaß<br />HD cm</th>
             <th className="pb-2 text-right text-xs font-semibold text-mu">Bundmaß<br />GD cm</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
-          {lothölzer.map((lot) => (
-            <tr key={lot.nr}>
-              <td className="py-2.5 text-mu">{lot.nr}</td>
-              <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))}</td>
-              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosA))}</td>
-              <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosG))}</td>
-            </tr>
-          ))}
+          {lothölzer.map((lot) => {
+            const hoehey = lot.hoehe - schmiegeA - schmiegeG;
+            return (
+              <tr key={lot.nr}>
+                <td className="py-2.5 text-mu">{lot.nr}</td>
+                <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(round1(lot.hoehe))}</td>
+                <td className="py-2.5 text-right tabular-nums font-bold text-pine">{fmt(round1(hoehey))}</td>
+                <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosA))}</td>
+                <td className="py-2.5 text-right tabular-nums text-tx">{fmt(round1(lot.abstand / cosG))}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <p className="mt-1.5 text-[10px] text-dm">
-        Höhe x = Gesamtlänge · Bundmaß = Abstand von VK entlang des Holzes
+        x = Gesamtlänge · y = Mittelmaß (ohne Schmiegen) · Bundmaß = Abstand von VK entlang des Holzes
       </p>
     </div>
   );
