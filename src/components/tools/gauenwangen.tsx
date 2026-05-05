@@ -344,6 +344,12 @@ export function GauenwangenTool() {
                 farbe="#c9924a"
                 links={{ label: "Fußschnitt", anzeigeGrad: round1(90 - p.alpha), zeichenGrad: p.alpha }}
                 rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst, verstichmass: true }}
+                dimLinien={{
+                  gesamtlaenge: erg.L_hauptdach,
+                  hauptVers:    p.b * Math.tan(toRad(p.alpha)),
+                  gaubeVers:    p.b / Math.tan(toRad(erg.schnittFirst)),
+                  mitte:        erg.L_hauptdach - p.b * Math.tan(toRad(p.alpha)) - p.b / Math.tan(toRad(erg.schnittFirst)),
+                }}
               />
               <HolzSchematik
                 name="Holz an Gaubendach"
@@ -351,6 +357,13 @@ export function GauenwangenTool() {
                 farbe="#c9924a"
                 links={{ label: "Vorschnitt", anzeigeGrad: round1(90 - p.gamma), zeichenGrad: p.gamma }}
                 rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst, verstichmass: true }}
+                linksGekippt
+                dimLinien={{
+                  gesamtlaenge: erg.L_gaubendach,
+                  hauptVers:    p.b * Math.tan(toRad(p.gamma)),
+                  gaubeVers:    p.b / Math.tan(toRad(erg.schnittFirst)),
+                  mitte:        erg.L_gaubendach - p.b * Math.tan(toRad(p.gamma)) - p.b / Math.tan(toRad(erg.schnittFirst)),
+                }}
               />
             </CardContent>
           </Card>
@@ -473,6 +486,14 @@ function HolzSchematik({
   const dimBelowY = Yoff + Ht + 14;
   const extC = "rgba(255,255,255,0.18)";
 
+  // Rundungs-sicherer Check: Mitte aus bereits gerundeten Werten ableiten
+  // → verhindert 1mm-Differenz durch unabhängiges Runden
+  const dim10   = (v: number) => Math.round(v * 10);
+  const dimGL   = dimLinien ? dim10(dimLinien.gesamtlaenge) : 0;
+  const dimHV   = dimLinien ? dim10(dimLinien.hauptVers)   : 0;
+  const dimGV   = dimLinien ? dim10(dimLinien.gaubeVers)   : 0;
+  const dimMi   = dimLinien ? dimGL - dimHV - dimGV        : 0; // exakte Ganzzahl-Arithmetik
+
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
@@ -500,12 +521,12 @@ function HolzSchematik({
             <line x1={W}   y1={Yoff + Ht} x2={W}   y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
 
             {/* Oben: Gesamtlänge (Spitze–Spitze) */}
-            <DimSeg x1={0} x2={W} y={dimAboveY} label={`${fmt(round1(dimLinien.gesamtlaenge))} cm`} above={true} />
+            <DimSeg x1={0} x2={W} y={dimAboveY} label={`${fmt(dimGL / 10)} cm`} above={true} />
 
             {/* Unten: dreiteilige Maßkette */}
-            <DimSeg x1={0}       x2={ohL}     y={dimBelowY} label={`↕ ${fmt(round1(dimLinien.hauptVers))} cm`}  above={false} />
-            <DimSeg x1={ohL}     x2={W - ohR} y={dimBelowY} label={`${fmt(round1(dimLinien.mitte))} cm`}         above={false} />
-            <DimSeg x1={W - ohR} x2={W}       y={dimBelowY} label={`↕ ${fmt(round1(dimLinien.gaubeVers))} cm`}  above={false} />
+            <DimSeg x1={0}       x2={ohL}     y={dimBelowY} label={`↕ ${fmt(dimHV / 10)} cm`}  above={false} />
+            <DimSeg x1={ohL}     x2={W - ohR} y={dimBelowY} label={`${fmt(dimMi / 10)} cm`}         above={false} />
+            <DimSeg x1={W - ohR} x2={W}       y={dimBelowY} label={`↕ ${fmt(dimGV / 10)} cm`}  above={false} />
           </>
         )}
       </svg>
