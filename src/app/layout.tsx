@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { TopNavigation } from "@/components/top-navigation";
+import { FeedbackWidget } from "@/components/feedback-widget";
 
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
           <TopNavigation />
           <main className="flex-1">{children}</main>
         </div>
+        <FeedbackWidget />
       </body>
     </html>
   );
