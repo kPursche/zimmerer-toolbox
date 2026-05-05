@@ -15,7 +15,6 @@ import {
 const toRad = (deg: number) => (deg * Math.PI) / 180;
 const fmt   = (v: number, dec = 1) => v.toFixed(dec);
 const round1 = (v: number) => Math.round(v * 10) / 10;
-const verstichmass = (deg: number) => (10 * Math.tan(toRad(deg))).toFixed(1);
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
@@ -314,7 +313,7 @@ export function GauenwangenTool() {
                 farbe="#c9924a"
                 links={{ label: "Vorschnitt", anzeigeGrad: round1(90 - p.gamma), zeichenGrad: p.gamma }}
                 rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst }}
-                linksGekippt
+                rechtsGekippt
                 dimLinien={{
                   gesamtlaenge: erg.L_gaubendach,
                   hauptVers:    p.b * Math.tan(toRad(p.gamma)),
@@ -333,14 +332,13 @@ export function GauenwangenTool() {
                       Pos. = Abstand von Vorderkante entlang des Holzes
                     </p>
                   </div>
-                  <div>
-                    <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-dm">Option B — Positionsstreifen</p>
-                    <LotholzStreifen lothölzer={erg.lothölzer} T={erg.T} b={p.b} />
-                  </div>
-                  <div>
-                    <p className="mb-2 text-[9px] font-bold uppercase tracking-widest text-dm">Option A — Maßtabelle</p>
-                    <LotholzTabelle lothölzer={erg.lothölzer} alpha={p.alpha} gamma={p.gamma} />
-                  </div>
+                  <GaubenwangeSkizze
+                    lothölzer={erg.lothölzer}
+                    L_eckstaender={erg.L_eckstaender}
+                    T={erg.T}
+                    b={p.b}
+                  />
+                  <LotholzTabelle lothölzer={erg.lothölzer} alpha={p.alpha} gamma={p.gamma} />
                 </div>
               )}
             </CardContent>
@@ -431,45 +429,6 @@ function DimSeg({ x1, x2, y, label, above }: {
   );
 }
 
-function LotholzStreifen({ lothölzer, T, b }: {
-  lothölzer: Lotholz[]; T: number; b: number;
-}) {
-  const W = 300;
-  const lP = 22; const rP = 22;
-  const uw = W - lP - rP;
-  const scl = uw / T;
-  const bkTop = 20; const bkH = 20; const bkBot = bkTop + bkH;
-
-  return (
-    <svg viewBox={`0 0 ${W} 62`} className="w-full overflow-visible">
-      {/* Baseline */}
-      <line x1={lP} y1={bkBot} x2={W - rP} y2={bkBot} stroke="#2e2a1e" strokeWidth="1.5" />
-      {/* End markers */}
-      <line x1={lP}     y1={bkTop} x2={lP}     y2={bkBot + 3} stroke="#504840" strokeWidth="1" />
-      <line x1={W - rP} y1={bkTop} x2={W - rP} y2={bkBot + 3} stroke="#504840" strokeWidth="1" />
-      {/* VK / F labels beside baseline */}
-      <text x={lP - 3} y={bkBot + 2} fontSize="7.5" fill="#504840" textAnchor="end" dominantBaseline="middle">VK</text>
-      <text x={W - rP + 3} y={bkBot + 2} fontSize="7.5" fill="#504840" textAnchor="start" dominantBaseline="middle">F</text>
-      {/* Eckständer block */}
-      <rect x={lP} y={bkTop} width={Math.max(scl * b, 4)} height={bkH} fill="#7fb87a" fillOpacity="0.8" rx="1" />
-      {/* Lotholz ticks */}
-      {lothölzer.map((lot) => {
-        const xi = lP + scl * lot.abstand;
-        return (
-          <g key={lot.nr}>
-            <line x1={xi} y1={bkTop - 7} x2={xi} y2={bkBot + 3} stroke="#6fa8d4" strokeWidth="1.5" />
-            <text x={xi} y={bkTop - 10} fontSize="8" fill="#6fa8d4" textAnchor="middle" fontWeight="700">
-              {lot.nr}
-            </text>
-            <text x={xi} y={bkBot + 13} fontSize="8" fill="#6fa8d4" textAnchor="middle">
-              {fmt(round1(lot.hoehe))} cm
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 function LotholzTabelle({ lothölzer, alpha, gamma }: {
   lothölzer: Lotholz[]; alpha: number; gamma: number;
@@ -482,9 +441,9 @@ function LotholzTabelle({ lothölzer, alpha, gamma }: {
         <thead>
           <tr className="border-b border-border text-left">
             <th className="pb-2 font-semibold text-tx">Nr.</th>
-            <th className="pb-2 text-right font-semibold text-tx">Länge</th>
-            <th className="pb-2 text-right text-xs font-semibold text-mu">Pos. Hauptdach</th>
-            <th className="pb-2 text-right text-xs font-semibold text-mu">Pos. Gaubendach</th>
+            <th className="pb-2 text-right font-semibold text-tx">Höhe (lotrecht)</th>
+            <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag Hauptdach</th>
+            <th className="pb-2 text-right text-xs font-semibold text-mu">Anschlag Gaubendach</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
@@ -499,9 +458,96 @@ function LotholzTabelle({ lothölzer, alpha, gamma }: {
         </tbody>
       </table>
       <p className="mt-1.5 text-[10px] text-dm">
-        Pos. Hauptdach = entlang Holz von VK / Pos. Gaubendach = entlang Holz von VK
+        Höhe = lotrechtes Innenmass zwischen den Schmiegen · Anschlag = Abstand von VK entlang des Holzes
       </p>
     </div>
+  );
+}
+
+function GaubenwangeSkizze({ lothölzer, L_eckstaender, T, b }: {
+  lothölzer: Lotholz[]; L_eckstaender: number; T: number; b: number;
+}) {
+  const W = 300;
+  const lP = 18; const rP = 18;
+  const sw = W - lP - rP;
+  const scaleX = sw / T;
+  const yBase = 62; const yTop = 8;
+  const scaleY = (yBase - yTop) / L_eckstaender;
+
+  const sx = (x: number) => lP + x * scaleX;
+  const sy = (h: number) => yBase - h * scaleY;
+
+  const profilePts: [number, number][] = [
+    [0, L_eckstaender],
+    ...lothölzer.map((l): [number, number] => [l.abstand, l.hoehe]),
+    [T, 0],
+  ];
+
+  const allX = [0, ...lothölzer.map((l) => l.abstand)];
+  const dimY = yBase + 18;
+  const dc = "rgba(255,255,255,0.2)";
+  const dt = "rgba(255,255,255,0.4)";
+
+  return (
+    <svg viewBox={`0 0 ${W} 88`} className="w-full overflow-visible">
+      {/* Baseline (Hauptdach) */}
+      <line x1={lP} y1={yBase} x2={sx(T)} y2={yBase} stroke="#504840" strokeWidth="1.2" />
+      <line x1={lP}    y1={yBase - 3} x2={lP}    y2={yBase + 3} stroke="#504840" strokeWidth="1" />
+      <line x1={sx(T)} y1={yBase - 3} x2={sx(T)} y2={yBase + 3} stroke="#504840" strokeWidth="1" />
+      <text x={lP}    y={yBase + 11} fontSize="7.5" fill="#504840" textAnchor="middle">VK</text>
+      <text x={sx(T)} y={yBase + 11} fontSize="7.5" fill="#504840" textAnchor="middle">F</text>
+
+      {/* Gaubendach-Profil gestrichelt */}
+      <polyline
+        points={profilePts.map(([x, h]) => `${sx(x)},${sy(h)}`).join(" ")}
+        fill="none" stroke="rgba(201,146,74,0.45)" strokeWidth="1" strokeDasharray="4 2"
+      />
+
+      {/* Eckständer */}
+      <rect
+        x={lP} y={sy(L_eckstaender)}
+        width={Math.max(scaleX * b, 3)} height={L_eckstaender * scaleY}
+        fill="#7fb87a" fillOpacity="0.75" rx="1"
+      />
+      <text x={lP + Math.max(scaleX * b, 3) / 2} y={sy(L_eckstaender) - 3}
+        fontSize="7" fill="#7fb87a" textAnchor="middle">
+        {fmt(round1(L_eckstaender))} cm
+      </text>
+
+      {/* Lothölzer */}
+      {lothölzer.map((lot) => {
+        const xi = sx(lot.abstand);
+        const bw = Math.max(scaleX * b * 0.7, 2.5);
+        return (
+          <g key={lot.nr}>
+            <rect x={xi - bw / 2} y={sy(lot.hoehe)} width={bw} height={lot.hoehe * scaleY}
+              fill="#6fa8d4" fillOpacity="0.75" rx="1" />
+            <text x={xi} y={sy(lot.hoehe) - 3} fontSize="7" fill="#6fa8d4" textAnchor="middle">
+              {fmt(round1(lot.hoehe))} cm
+            </text>
+            <text x={xi} y={yBase + 11} fontSize="7" fill="#6fa8d4" textAnchor="middle" fontWeight="700">
+              {lot.nr}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Abstandsmaße zwischen den Ständern */}
+      {allX.map((x, i) => {
+        if (i === allX.length - 1) return null;
+        const x1 = sx(x); const x2 = sx(allX[i + 1]);
+        const mid = (x1 + x2) / 2;
+        const spacing = fmt(round1(allX[i + 1] - x));
+        return (
+          <g key={i}>
+            <line x1={x1} y1={dimY} x2={x2} y2={dimY} stroke={dc} strokeWidth="0.8" />
+            <line x1={x1} y1={dimY - 2} x2={x1} y2={dimY + 2} stroke={dc} strokeWidth="0.8" />
+            <line x1={x2} y1={dimY - 2} x2={x2} y2={dimY + 2} stroke={dc} strokeWidth="0.8" />
+            <text x={mid} y={dimY + 9} fontSize="7" fill={dt} textAnchor="middle">{spacing} cm</text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -566,11 +612,11 @@ function HolzSchematik({
             {/* Verlängerungslinien oben */}
             <line x1={0}   y1={Yoff} x2={0}   y2={dimAboveY + 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
             <line x1={W}   y1={Yoff} x2={W}   y2={dimAboveY + 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
-            {/* Verlängerungslinien unten */}
-            <line x1={0}   y1={Yoff + Ht} x2={0}   y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
-            <line x1={ohL} y1={Yoff + Ht} x2={ohL} y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
-            <line x1={W - ohR} y1={Yoff}    x2={W - ohR} y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
-            <line x1={W}   y1={Yoff + Ht} x2={W}   y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            {/* Verlängerungslinien unten — y-Start am tatsächlichen Eckpunkt */}
+            <line x1={0}       y1={linksGekippt ? Yoff : Yoff + Ht}  x2={0}       y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            <line x1={ohL}     y1={linksGekippt ? Yoff + Ht : Yoff}  x2={ohL}     y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            <line x1={W - ohR} y1={rechtsGekippt ? Yoff + Ht : Yoff} x2={W - ohR} y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
+            <line x1={W}       y1={rechtsGekippt ? Yoff : Yoff + Ht} x2={W}       y2={dimBelowY - 3} stroke={extC} strokeWidth="0.6" strokeDasharray="2 2" />
 
             {/* Oben: Gesamtlänge (Spitze–Spitze) */}
             <DimSeg x1={0} x2={W} y={dimAboveY} label={`${fmt(dimGL / 10)} cm`} above={true} />
@@ -591,11 +637,6 @@ function HolzSchematik({
         <div className="rounded-md bg-s2 px-3 py-2 text-right">
           <div className="text-[10px] uppercase tracking-wide text-mu">{rechts.label}</div>
           <div className="text-lg font-bold text-tx">{fmt(rechts.anzeigeGrad, 1)}°</div>
-          {rechts.verstichmass && (
-            <div className="text-xs font-semibold text-oak">
-              Stichmaß: {verstichmass(rechts.anzeigeGrad)} cm / 10 cm
-            </div>
-          )}
         </div>
       </div>
     </div>
