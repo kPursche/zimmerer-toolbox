@@ -10,4 +10,6 @@ export interface FeedMessage {
   created_at: string;
   name: string;
   message: string;
+  reply_to: string | null;
+  session_id: string | null;
 }
