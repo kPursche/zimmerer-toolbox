@@ -330,6 +330,7 @@ export function GauenwangenTool() {
                 farbe="#7fb87a"
                 links={{ label: "Hauptdach-Schmiege", anzeigeGrad: round1(p.alpha), zeichenGrad: p.alpha }}
                 rechts={{ label: "Gaubendach-Schmiege", anzeigeGrad: round1(p.gamma), zeichenGrad: p.gamma }}
+                rechtsGekippt
               />
               <HolzSchematik
                 name="Holz an Hauptdach"
@@ -344,6 +345,8 @@ export function GauenwangenTool() {
                 farbe="#c9924a"
                 links={{ label: "Vorschnitt", anzeigeGrad: round1(90 - p.gamma), zeichenGrad: p.gamma }}
                 rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: erg.schnittFirst, verstichmass: true }}
+                linksGekippt
+                rechtsGekippt
               />
             </CardContent>
           </Card>
@@ -409,26 +412,31 @@ interface SchnittInfo {
 }
 
 function HolzSchematik({
-  name, laenge, farbe, links, rechts,
+  name, laenge, farbe, links, rechts, linksGekippt = false, rechtsGekippt = false,
 }: {
   name: string; laenge: number; farbe: string;
   links: SchnittInfo; rechts: SchnittInfo;
+  linksGekippt?: boolean; rechtsGekippt?: boolean;
 }) {
   const W = 300; const Ht = 40; const Yoff = 4;
   const ohL = Math.min(Ht * Math.tan(toRad(links.zeichenGrad)), Ht);
   const ohR = Math.min(Ht * Math.tan(toRad(rechts.zeichenGrad)), Ht);
 
-  // Polygon: oben-links, oben-rechts, unten-rechts, unten-links
-  const pts = [
-    `${ohL},${Yoff}`,
-    `${W - ohR},${Yoff}`,
-    `${W},${Yoff + Ht}`,
-    `0,${Yoff + Ht}`,
-  ].join(" ");
+  // Standard: Unterkante übersteht (Trapez). Gekippt: Oberkante übersteht.
+  const TLx = linksGekippt ? 0 : ohL;
+  const BLx = linksGekippt ? ohL : 0;
+  const TRx = rechtsGekippt ? W : W - ohR;
+  const BRx = rechtsGekippt ? W - ohR : W;
 
-  // Winkelindikator-Hilfslinie am linken Schnitt
-  const arcL = `M ${ohL},${Yoff} L 0,${Yoff + Ht} M ${ohL},${Yoff} L ${ohL},${Yoff + Ht}`;
-  const arcR = `M ${W - ohR},${Yoff} L ${W},${Yoff + Ht} M ${W - ohR},${Yoff} L ${W - ohR},${Yoff + Ht}`;
+  const pts = [`${TLx},${Yoff}`, `${TRx},${Yoff}`, `${BRx},${Yoff + Ht}`, `${BLx},${Yoff + Ht}`].join(" ");
+
+  // Winkelindikator: Schnittlinie + Lotlinie vom Inneneck
+  const arcL = linksGekippt
+    ? `M 0,${Yoff} L ${ohL},${Yoff + Ht} M ${ohL},${Yoff} L ${ohL},${Yoff + Ht}`
+    : `M ${ohL},${Yoff} L 0,${Yoff + Ht} M ${ohL},${Yoff} L ${ohL},${Yoff + Ht}`;
+  const arcR = rechtsGekippt
+    ? `M ${W},${Yoff} L ${W - ohR},${Yoff + Ht} M ${W - ohR},${Yoff} L ${W - ohR},${Yoff + Ht}`
+    : `M ${W - ohR},${Yoff} L ${W},${Yoff + Ht} M ${W - ohR},${Yoff} L ${W - ohR},${Yoff + Ht}`;
 
   return (
     <div className="space-y-2">
