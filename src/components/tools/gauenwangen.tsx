@@ -337,14 +337,14 @@ export function GauenwangenTool() {
                 laenge={erg.L_hauptdach}
                 farbe="#c9924a"
                 links={{ label: "Fußschnitt", anzeigeGrad: round1(90 - p.alpha), zeichenGrad: p.alpha }}
-                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: erg.schnittFirst, verstichmass: true }}
+                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst, verstichmass: true }}
               />
               <HolzSchematik
                 name="Holz an Gaubendach"
                 laenge={erg.L_gaubendach}
                 farbe="#c9924a"
                 links={{ label: "Vorschnitt", anzeigeGrad: round1(90 - p.gamma), zeichenGrad: p.gamma }}
-                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: erg.schnittFirst, verstichmass: true }}
+                rechts={{ label: "Firstschnitt", anzeigeGrad: round1(erg.schnittFirst), zeichenGrad: 90 - erg.schnittFirst, verstichmass: true }}
                 linksGekippt
                 rechtsGekippt
               />
@@ -419,8 +419,8 @@ function HolzSchematik({
   linksGekippt?: boolean; rechtsGekippt?: boolean;
 }) {
   const W = 300; const Ht = 40; const Yoff = 4;
-  const ohL = Math.min(Ht * Math.tan(toRad(links.zeichenGrad)), Ht);
-  const ohR = Math.min(Ht * Math.tan(toRad(rechts.zeichenGrad)), Ht);
+  const ohL = Math.min(Ht * Math.tan(toRad(links.zeichenGrad)), W / 2 - 5);
+  const ohR = Math.min(Ht * Math.tan(toRad(rechts.zeichenGrad)), W / 2 - 5);
 
   // Standard: Unterkante übersteht (Trapez). Gekippt: Oberkante übersteht.
   const TLx = linksGekippt ? 0 : ohL;
