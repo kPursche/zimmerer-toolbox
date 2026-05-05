@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Hammer, LogIn } from "lucide-react";
+import { ChevronRight, Hammer, LogIn, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getToolBySlug } from "@/lib/tools";
@@ -26,6 +26,7 @@ export function TopNavigation() {
       return tool?.name ?? "Tool";
     }
     if (pathname === "/login") return "Anmelden";
+    if (pathname === "/community") return "Community";
     return null;
   })();
 
@@ -64,6 +65,19 @@ export function TopNavigation() {
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Community-Link */}
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className={cn(pathname === "/community" && "text-oak")}
+        >
+          <Link href="/community">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Community</span>
+          </Link>
+        </Button>
 
         {/* Auth-Platzhalter (PROJ-2 verdrahtet das mit Supabase) */}
         <Button
