@@ -100,7 +100,9 @@ export function LatteneinteilungTool() {
   const [kiAntwort, setKiAntwort] = useState<string | null>(null);
   const [kiLoading, setKiLoading] = useState(false);
   const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const standbyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Berechnung der Lattenabstände
   const abstaende = useMemo(() => {
@@ -141,37 +143,92 @@ export function LatteneinteilungTool() {
     return;
   }, []);
 
+  // Wake Lock für Bildschirm-aus-Funktionalität
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isListening) {
+        try {
+          const lock = await navigator.wakeLock.request('screen');
+          setWakeLock(lock);
+
+          lock.addEventListener('release', () => {
+            setWakeLock(null);
+          });
+        } catch (err) {
+          console.log('Wake Lock nicht verfügbar:', err);
+        }
+      }
+    };
+
+    const releaseWakeLock = () => {
+      if (wakeLock) {
+        wakeLock.release();
+        setWakeLock(null);
+      }
+    };
+
+    if (isListening) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    return () => {
+      releaseWakeLock();
+    };
+  }, [isListening, wakeLock]);
+
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.lang = 'de-DE';
-      recognitionRef.current.continuous = false;
+      recognitionRef.current.continuous = true; // Kontinuierliche Erkennung
       recognitionRef.current.interimResults = false;
 
       recognitionRef.current.onresult = async (event) => {
-        const command = event.results[0][0].transcript;
-        try {
-          setKiLoading(true);
-          setKiAntwort(null);
-          const response = await askKi(command, {
-            gesamtMass: parseFloat(eingaben.gesamtMass.replace(',', '.')) || null,
-            anzahlLatten: parseInt(eingaben.anzahlLatten, 10) || null,
-            lattenMass: abstaende.length > 1 ? abstaende[1].position - abstaende[0].position : null,
-            abstaende: abstaende.map((a) => ({ nr: a.nr, position: a.position })),
-          });
-          setKiAntwort(response);
-          if (audioEnabled) speakText(response, voice);
-        } catch (error) {
-          const fallback = "Entschuldigung, die KI konnte die Anfrage nicht verarbeiten.";
-          setKiAntwort(fallback);
-          speakText(fallback, voice);
-        } finally {
-          setKiLoading(false);
+        const command = event.results[event.results.length - 1][0].transcript;
+        if (command.trim()) {
+          try {
+            setKiLoading(true);
+            setKiAntwort(null);
+            const response = await askKi(command, {
+              gesamtMass: parseFloat(eingaben.gesamtMass.replace(',', '.')) || null,
+              anzahlLatten: parseInt(eingaben.anzahlLatten, 10) || null,
+              lattenMass: abstaende.length > 1 ? abstaende[1].position - abstaende[0].position : null,
+              abstaende: abstaende.map((a) => ({ nr: a.nr, position: a.position })),
+            });
+            setKiAntwort(response);
+            if (audioEnabled) speakText(response, voice);
+
+            // Standby-Timeout zurücksetzen
+            if (standbyTimeoutRef.current) {
+              clearTimeout(standbyTimeoutRef.current);
+            }
+            standbyTimeoutRef.current = setTimeout(() => {
+              if (recognitionRef.current) {
+                recognitionRef.current.stop();
+              }
+            }, 60000); // 1 Minute Standby
+          } catch (error) {
+            const fallback = "Entschuldigung, die KI konnte die Anfrage nicht verarbeiten.";
+            setKiAntwort(fallback);
+            if (audioEnabled) speakText(fallback, voice);
+          } finally {
+            setKiLoading(false);
+          }
         }
       };
 
       recognitionRef.current.onend = () => {
+        setIsListening(false);
+        if (standbyTimeoutRef.current) {
+          clearTimeout(standbyTimeoutRef.current);
+        }
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
         setIsListening(false);
       };
     }
@@ -179,6 +236,9 @@ export function LatteneinteilungTool() {
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
+      }
+      if (standbyTimeoutRef.current) {
+        clearTimeout(standbyTimeoutRef.current);
       }
     };
   }, [audioEnabled, eingaben, abstaende, voice]);
@@ -197,24 +257,14 @@ export function LatteneinteilungTool() {
 
     if (isListening) {
       recognitionRef.current.stop();
+      if (standbyTimeoutRef.current) {
+        clearTimeout(standbyTimeoutRef.current);
+      }
     } else {
       recognitionRef.current.start();
       setIsListening(true);
     }
   }, [isListening, voice]);
-
-  const speakAllMasse = useCallback(() => {
-    if (abstaende.length === 0) {
-      speakText("Keine Maße berechnet", voice);
-      return;
-    }
-
-    const text = abstaende
-      .map((abstand) => `Latte ${abstand.nr}: ${abstand.position.toFixed(1)} Zentimeter`)
-      .join(", ");
-
-    speakText(`Lattenmaße: ${text}`, voice);
-  }, [abstaende, voice]);
 
   const toggleAudio = useCallback(() => {
     setAudioEnabled(prev => !prev);
@@ -258,6 +308,14 @@ export function LatteneinteilungTool() {
               />
             </div>
           </div>
+
+          {lattenMass > 0 && (
+            <div className="pt-2 border-t">
+              <Badge variant="default" className="text-lg font-semibold">
+                Errechnetes Lattenmaß: {lattenMass.toFixed(1)} cm
+              </Badge>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -271,14 +329,6 @@ export function LatteneinteilungTool() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
-            <Button
-              onClick={speakAllMasse}
-              disabled={!audioEnabled || abstaende.length === 0}
-              variant="outline"
-            >
-              <Volume2 className="w-4 h-4 mr-2" />
-              Alle Maße vorlesen
-            </Button>
             <Button
               onClick={toggleListening}
               disabled={!recognitionRef.current}
@@ -303,7 +353,7 @@ export function LatteneinteilungTool() {
 
           <Alert className="mt-4">
             <AlertDescription>
-              <strong>Natürliche Sprachsteuerung:</strong> Frage zum Beispiel: "Wie groß ist das berechnete Lattenmaß?" oder "Was war das Maß nach 99,8 cm?"
+              <strong>KI-Sprachsteuerung:</strong> Starte die Spracherkennung und stelle natürliche Fragen. Die KI bleibt 1 Minute im Lauschmodus. Funktioniert auch bei ausgeschaltetem Bildschirm.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -333,12 +383,7 @@ export function LatteneinteilungTool() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-2">
-              <Badge variant="secondary" className="text-sm">
-                Berechnetes Lattenmaß: {lattenMass.toFixed(1)} cm
-              </Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               {abstaende.map((abstand) => (
                 <Badge key={abstand.nr} variant="secondary" className="text-sm">
                   Latte {abstand.nr}: {abstand.position.toFixed(1)} cm
