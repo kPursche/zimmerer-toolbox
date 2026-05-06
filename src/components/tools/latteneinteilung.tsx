@@ -57,18 +57,34 @@ function berechneLattenAbstaende(gesamtMass: number, anzahlLatten: number): Latt
 
 // ─── Audio-Funktionen ─────────────────────────────────────────────────────────
 
-function speakText(text: string, voice: SpeechSynthesisVoice | null) {
-  if ('speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'de-DE';
-    utterance.rate = 0.95;
-    utterance.pitch = 1.05;
-    utterance.volume = 1;
-    if (voice) {
-      utterance.voice = voice;
+async function speakText(text: string) {
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) {
+      throw new Error('TTS failed');
     }
-    speechSynthesis.cancel();
-    speechSynthesis.speak(utterance);
+
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    audio.play();
+  } catch (error) {
+    console.error('TTS error:', error);
+    // Fallback to browser speech synthesis
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'de-DE';
+      utterance.rate = 0.95;
+      utterance.pitch = 1.05;
+      utterance.volume = 1;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utterance);
+    }
   }
 }
 
@@ -201,7 +217,7 @@ export function LatteneinteilungTool() {
               abstaende: abstaende.map((a) => ({ nr: a.nr, position: a.position })),
             });
             setKiAntwort(response);
-            if (audioEnabled) speakText(response, voice);
+            if (audioEnabled) speakText(response);
 
             // Standby-Timeout zurücksetzen
             if (standbyTimeoutRef.current) {
@@ -215,7 +231,7 @@ export function LatteneinteilungTool() {
           } catch (error) {
             const fallback = "Entschuldigung, die KI konnte die Anfrage nicht verarbeiten.";
             setKiAntwort(fallback);
-            if (audioEnabled) speakText(fallback, voice);
+            if (audioEnabled) speakText(fallback);
           } finally {
             setKiLoading(false);
           }
@@ -253,7 +269,7 @@ export function LatteneinteilungTool() {
   // Audio-Steuerung
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) {
-      speakText("Spracherkennung nicht verfügbar in diesem Browser", voice);
+      speakText("Spracherkennung nicht verfügbar in diesem Browser");
       return;
     }
 
