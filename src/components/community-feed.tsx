@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Reply, Send, Trash2, X } from "lucide-react";
+import { Mic, MicOff, Reply, Send, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase, type FeedMessage } from "@/lib/supabase";
+
+type RecordState = "idle" | "recording" | "transcribing";
 
 // Session-ID für Eigentümerprüfung (kein Login nötig)
 function getSessionId(): string {
@@ -41,8 +43,11 @@ export function CommunityFeed() {
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<FeedMessage | null>(null);
   const [sessionId, setSessionId] = useState("");
+  const [recordState, setRecordState] = useState<RecordState>("idle");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     setSessionId(getSessionId());
@@ -108,6 +113,53 @@ export function CommunityFeed() {
       handleSend();
     }
     if (e.key === "Escape") setReplyTo(null);
+  }
+
+  async function handleMic() {
+    if (recordState === "recording") {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/ogg";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      chunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecordState("transcribing");
+
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const ext = mimeType.includes("webm") ? "webm" : "ogg";
+        const formData = new FormData();
+        formData.append("audio", blob, `aufnahme.${ext}`);
+
+        try {
+          const res = await fetch("/api/transcribe", { method: "POST", body: formData });
+          const data = await res.json();
+          if (data.text) {
+            setText((prev) => prev ? `${prev} ${data.text}` : data.text);
+            inputRef.current?.focus();
+          }
+        } catch {
+          // Transkription fehlgeschlagen — still fail
+        } finally {
+          setRecordState("idle");
+        }
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setRecordState("recording");
+    } catch {
+      setRecordState("idle");
+    }
   }
 
   const msgMap = new Map(messages.map((m) => [m.id, m]));
@@ -199,6 +251,25 @@ export function CommunityFeed() {
               rows={2}
               className="resize-none border-bd bg-s2 text-tx placeholder:text-dm focus-visible:ring-oak"
             />
+            {/* Mikrofon-Button */}
+            <button
+              onClick={handleMic}
+              disabled={recordState === "transcribing"}
+              title={recordState === "recording" ? "Aufnahme stoppen" : "Sprachnachricht"}
+              className={`shrink-0 self-end rounded-lg p-2.5 transition-colors disabled:opacity-50 ${
+                recordState === "recording"
+                  ? "animate-pulse bg-[#d47070] text-white"
+                  : recordState === "transcribing"
+                  ? "bg-s3 text-mu"
+                  : "bg-s3 text-mu hover:text-tx"
+              }`}
+            >
+              {recordState === "recording" ? (
+                <MicOff className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+            </button>
             <Button
               onClick={handleSend}
               disabled={!text.trim() || sending}
@@ -207,6 +278,9 @@ export function CommunityFeed() {
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          {recordState === "transcribing" && (
+            <p className="text-center text-[11px] text-mu">Wird transkribiert…</p>
+          )}
         </div>
       </div>
     </div>
