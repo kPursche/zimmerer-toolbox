@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ElevenLabsAPI } from "@elevenlabs/elevenlabs-js";
+import { ElevenLabsClient } from "elevenlabs";
 
 export async function POST(req: NextRequest) {
   if (!process.env.ELEVENLABS_API_KEY) {
@@ -13,11 +13,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Kein Text gesendet" }, { status: 400 });
   }
 
-  const elevenlabs = new ElevenLabsAPI({ apiKey: process.env.ELEVENLABS_API_KEY });
+  const elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY });
 
   try {
-    const audioStream = await elevenlabs.generate({
-      voice: "Arnold", // Klare deutsche Stimme für Zahlen
+    const audioStream = await elevenlabs.textToSpeech.convert("VR6AewLTigWG4xSOukaG", {
       text: text,
       model_id: "eleven_monolingual_v1",
     });
