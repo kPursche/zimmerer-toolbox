@@ -145,7 +145,6 @@ export function CommunityFeed() {
           const data = await res.json();
           if (data.text) {
             setText((prev) => prev ? `${prev} ${data.text}` : data.text);
-            inputRef.current?.focus();
           }
         } catch {
           // Transkription fehlgeschlagen — still fail
