@@ -219,15 +219,7 @@ export function LatteneinteilungTool() {
             setKiAntwort(response);
             if (audioEnabled) speakText(response);
 
-            // Standby-Timeout zurücksetzen
-            if (standbyTimeoutRef.current) {
-              clearTimeout(standbyTimeoutRef.current);
-            }
-            standbyTimeoutRef.current = setTimeout(() => {
-              if (recognitionRef.current) {
-                recognitionRef.current.stop();
-              }
-            }, 60000); // 1 Minute Standby
+            // Standby-Timeout bleibt aktiv
           } catch (error) {
             const fallback = "Entschuldigung, die KI konnte die Anfrage nicht verarbeiten.";
             setKiAntwort(fallback);
