@@ -1,9 +1,10 @@
 # PROJ-4: Dachlatten- und Pfanneneinteilung
 
-**Status:** In Progress
+**Status:** Deployed
 **Priorität:** P0 (MVP)
 **Erstellt:** 2026-05-02
 **Aktualisiert:** 2026-05-06
+**Deployed:** 2026-05-06
 
 ## Beschreibung
 Umfassendes Tool für die Berechnung von Dachlatten- und Pfanneneinteilung. Beinhaltet Auswahl von Dachpfannen gängiger Hersteller mit integrierten Produktkatalogen, automatische Berechnung von Lattenmaßen, Pfanneneinteilung in der Breite mit Berücksichtigung von Ortgangsteinen und Gauben/Dachfenstern. Besonderes Feature: Auditive KI-Unterhaltung für Maßausgaben, funktioniert auch bei ausgeschaltetem Bildschirm.
