@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronUp } from "lucide-react";
+import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   Card,
   CardContent,
@@ -101,6 +102,7 @@ export function LatteneinteilungTool() {
   const [kiLoading, setKiLoading] = useState(false);
   const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
   const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null);
+  const [collapsed, setCollapsed] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const standbyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -126,7 +128,7 @@ export function LatteneinteilungTool() {
       const loadVoices = () => {
         const voices = speechSynthesis.getVoices();
         const preferred = voices.find(
-          (v) => v.lang.startsWith('de') && v.name.toLowerCase().includes('google'),
+          (v) => v.lang.startsWith('de') && !v.name.toLowerCase().includes('google'),
         );
         setVoice(preferred ?? voices.find((v) => v.lang.startsWith('de')) ?? voices[0] ?? null);
       };
@@ -328,7 +330,7 @@ export function LatteneinteilungTool() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <Button
               onClick={toggleListening}
               disabled={!recognitionRef.current}
@@ -376,21 +378,37 @@ export function LatteneinteilungTool() {
 
       {abstaende.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>Ergebnis</CardTitle>
-            <CardDescription>
-              Berechnetes Lattenmaß und Abstände.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-              {abstaende.map((abstand) => (
-                <Badge key={abstand.nr} variant="secondary" className="text-sm">
-                  Latte {abstand.nr}: {abstand.position.toFixed(1)} cm
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
+          <Collapsible.Root open={!collapsed} onOpenChange={(open) => setCollapsed(!open)}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Ergebnis</CardTitle>
+                  <CardDescription>
+                    Berechnetes Lattenmaß und Abstände.
+                  </CardDescription>
+                </div>
+                <Collapsible.Trigger asChild>
+                  <Button variant="ghost" size="sm">
+                    {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                  </Button>
+                </Collapsible.Trigger>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {(collapsed ? abstaende.slice(0, 3) : abstaende).map((abstand) => (
+                  <Badge key={abstand.nr} variant="secondary" className="text-sm">
+                    Latte {abstand.nr}: {abstand.position.toFixed(1)} cm
+                  </Badge>
+                ))}
+                {collapsed && abstaende.length > 3 && (
+                  <Badge variant="outline" className="text-sm">
+                    ... und {abstaende.length - 3} weitere
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Collapsible.Root>
         </Card>
       )}
     </div>

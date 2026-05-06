@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const systemPrompt = `Du bist ein deutscher Assistent für Dachlatten-Einteilung. Antworte immer freundlich, präzise und nutzerzentriert. Der Nutzer gibt Maße für die Lattenanordnung ein und möchte natürliche Sprachbefehle nutzen. Verwende bei Bedarf die aktuellen Rechnungsdaten aus dem Kontext.`;
+  const systemPrompt = `Du bist ein deutscher Assistent für Dachlatten-Einteilung. Antworte immer kurz und präzise, ohne lange Erklärungen. Verwende bei Bedarf die aktuellen Rechnungsdaten aus dem Kontext. Gib nur die notwendigen Informationen.`;
   const contextLines = [];
 
   if (context?.gesamtMass != null && context?.anzahlLatten != null && context?.lattenMass != null) {
