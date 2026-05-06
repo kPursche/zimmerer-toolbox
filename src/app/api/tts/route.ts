@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { ElevenLabsAPI } from "@elevenlabs/elevenlabs-js";
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "OPENAI_API_KEY nicht konfiguriert" }, { status: 500 });
+  if (!process.env.ELEVENLABS_API_KEY) {
+    return NextResponse.json({ error: "ELEVENLABS_API_KEY nicht konfiguriert" }, { status: 500 });
   }
 
   const body = await req.json();
@@ -13,24 +13,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Kein Text gesendet" }, { status: 400 });
   }
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const elevenlabs = new ElevenLabsAPI({ apiKey: process.env.ELEVENLABS_API_KEY });
 
   try {
-    const mp3 = await openai.audio.speech.create({
-      model: "tts-1",
-      voice: "nova", // Hochwertige deutsche Stimme
-      input: text,
-      response_format: "mp3",
+    const audioStream = await elevenlabs.generate({
+      voice: "Arnold", // Klare deutsche Stimme für Zahlen
+      text: text,
+      model_id: "eleven_monolingual_v1",
     });
 
-    const buffer = await mp3.arrayBuffer();
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of audioStream) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "audio/mpeg",
       },
     });
   } catch (error) {
-    console.error("[tts] OpenAI-Fehler:", error);
+    console.error("[tts] Eleven Labs Fehler:", error);
     return NextResponse.json({ error: "TTS-Verarbeitung fehlgeschlagen" }, { status: 502 });
   }
 }
