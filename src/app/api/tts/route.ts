@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   const elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY });
 
   try {
-    const audioStream = await elevenlabs.textToSpeech.convert("VR6AewLTigWG4xSOukaG", {
+    const audioStream = await elevenlabs.textToSpeech.convert("pNInz6obpgDQGcFmaJgB", { // Daniel
       text: text,
       model_id: "eleven_monolingual_v1",
     });
