@@ -28,6 +28,13 @@ interface LattenAbstand {
   position: number; // Position vom Startpunkt in cm
 }
 
+interface KiContext {
+  gesamtMass: number | null;
+  anzahlLatten: number | null;
+  lattenMass: number | null;
+  abstaende: Array<{ nr: number; position: number }>;
+}
+
 // ─── Berechnung ───────────────────────────────────────────────────────────────
 
 function berechneLattenAbstaende(gesamtMass: number, anzahlLatten: number): LattenAbstand[] {
@@ -49,45 +56,35 @@ function berechneLattenAbstaende(gesamtMass: number, anzahlLatten: number): Latt
 
 // ─── Audio-Funktionen ─────────────────────────────────────────────────────────
 
-function speakText(text: string) {
+function speakText(text: string, voice: SpeechSynthesisVoice | null) {
   if ('speechSynthesis' in window) {
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'de-DE'; // Deutsche Sprache
-    utterance.rate = 0.8; // Etwas langsamer
+    utterance.lang = 'de-DE';
+    utterance.rate = 0.95;
+    utterance.pitch = 1.05;
+    utterance.volume = 1;
+    if (voice) {
+      utterance.voice = voice;
+    }
+    speechSynthesis.cancel();
     speechSynthesis.speak(utterance);
   }
 }
 
-function parseVoiceCommand(command: string, abstaende: LattenAbstand[]): string | null {
-  const cmd = command.toLowerCase().trim();
+async function askKi(prompt: string, context: KiContext) {
+  const response = await fetch('/api/latten-ki', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, context }),
+  });
 
-  // "erstes Maß" oder "erstes lattenmaß"
-  if (cmd.includes('erstes') && (cmd.includes('maß') || cmd.includes('lattenmaß'))) {
-    if (abstaende.length > 0) {
-      return `Erstes Lattenmaß: ${abstaende[0].position.toFixed(1)} Zentimeter`;
-    }
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error?.error ?? 'KI-Fehler');
   }
 
-  // "nächstes" oder "weiter"
-  if (cmd.includes('nächstes') || cmd.includes('weiter')) {
-    // Hier würde ein State für den aktuellen Index benötigt werden
-    return "Nächstes Maß: Implementierung folgt";
-  }
-
-  // "nach X cm" oder "nach X,Y cm"
-  const nachMatch = cmd.match(/nach\s+([\d,.]+)\s*cm/);
-  if (nachMatch) {
-    const targetMass = parseFloat(nachMatch[1].replace(',', '.'));
-    const gefunden = abstaende.find(a => Math.abs(a.position - targetMass) < 0.1);
-    if (gefunden) {
-      const nextIndex = abstaende.indexOf(gefunden) + 1;
-      if (nextIndex < abstaende.length) {
-        return `Nach ${targetMass.toFixed(1)} cm kommt: ${abstaende[nextIndex].position.toFixed(1)} Zentimeter`;
-      }
-    }
-  }
-
-  return null;
+  const data = await response.json();
+  return data.text as string;
 }
 
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
@@ -100,6 +97,9 @@ export function LatteneinteilungTool() {
 
   const [isListening, setIsListening] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [kiAntwort, setKiAntwort] = useState<string | null>(null);
+  const [kiLoading, setKiLoading] = useState(false);
+  const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Berechnung der Lattenabstände
@@ -114,13 +114,34 @@ export function LatteneinteilungTool() {
     return berechneLattenAbstaende(mass, anzahl);
   }, [eingaben]);
 
-  // Audio-Setup beim Mount
+  const lattenMass = useMemo(() => {
+    if (abstaende.length <= 1) return 0;
+    return abstaende[1].position - abstaende[0].position;
+  }, [abstaende]);
+
   useEffect(() => {
     if ('speechSynthesis' in window) {
+      const loadVoices = () => {
+        const voices = speechSynthesis.getVoices();
+        const preferred = voices.find(
+          (v) => v.lang.startsWith('de') && v.name.toLowerCase().includes('google'),
+        );
+        setVoice(preferred ?? voices.find((v) => v.lang.startsWith('de')) ?? voices[0] ?? null);
+      };
+
+      loadVoices();
+      speechSynthesis.onvoiceschanged = loadVoices;
       setAudioEnabled(true);
+
+      return () => {
+        speechSynthesis.onvoiceschanged = null;
+      };
     }
 
-    // Speech Recognition Setup
+    return;
+  }, []);
+
+  useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
@@ -128,13 +149,25 @@ export function LatteneinteilungTool() {
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
 
-      recognitionRef.current.onresult = (event) => {
+      recognitionRef.current.onresult = async (event) => {
         const command = event.results[0][0].transcript;
-        const response = parseVoiceCommand(command, abstaende);
-        if (response) {
-          speakText(response);
-        } else {
-          speakText("Befehl nicht verstanden. Versuche: 'erstes Maß', 'nächstes' oder 'nach 99,8 cm'");
+        try {
+          setKiLoading(true);
+          setKiAntwort(null);
+          const response = await askKi(command, {
+            gesamtMass: parseFloat(eingaben.gesamtMass.replace(',', '.')) || null,
+            anzahlLatten: parseInt(eingaben.anzahlLatten, 10) || null,
+            lattenMass: abstaende.length > 1 ? abstaende[1].position - abstaende[0].position : null,
+            abstaende: abstaende.map((a) => ({ nr: a.nr, position: a.position })),
+          });
+          setKiAntwort(response);
+          if (audioEnabled) speakText(response, voice);
+        } catch (error) {
+          const fallback = "Entschuldigung, die KI konnte die Anfrage nicht verarbeiten.";
+          setKiAntwort(fallback);
+          speakText(fallback, voice);
+        } finally {
+          setKiLoading(false);
         }
       };
 
@@ -147,9 +180,8 @@ export function LatteneinteilungTool() {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
-      speechSynthesis.cancel();
     };
-  }, [abstaende]);
+  }, [audioEnabled, eingaben, abstaende, voice]);
 
   // Eingabe-Handler
   const handleInputChange = useCallback((field: keyof Eingaben, value: string) => {
@@ -159,7 +191,7 @@ export function LatteneinteilungTool() {
   // Audio-Steuerung
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) {
-      speakText("Spracherkennung nicht verfügbar in diesem Browser");
+      speakText("Spracherkennung nicht verfügbar in diesem Browser", voice);
       return;
     }
 
@@ -169,23 +201,20 @@ export function LatteneinteilungTool() {
       recognitionRef.current.start();
       setIsListening(true);
     }
-  }, [isListening]);
+  }, [isListening, voice]);
 
   const speakAllMasse = useCallback(() => {
     if (abstaende.length === 0) {
-      speakText("Keine Maße berechnet");
+      speakText("Keine Maße berechnet", voice);
       return;
     }
 
-    let text = "Lattenmaße: ";
-    abstaende.forEach((abstand, index) => {
-      text += `${abstand.position.toFixed(1)}`;
-      if (index < abstaende.length - 1) text += ", ";
-    });
-    text += " Zentimeter";
+    const text = abstaende
+      .map((abstand) => `Latte ${abstand.nr}: ${abstand.position.toFixed(1)} Zentimeter`)
+      .join(", ");
 
-    speakText(text);
-  }, [abstaende]);
+    speakText(`Lattenmaße: ${text}`, voice);
+  }, [abstaende, voice]);
 
   const toggleAudio = useCallback(() => {
     setAudioEnabled(prev => !prev);
@@ -274,23 +303,42 @@ export function LatteneinteilungTool() {
 
           <Alert className="mt-4">
             <AlertDescription>
-              <strong>Sprachbefehle:</strong> "erstes Maß", "nächstes", "nach 99,8 cm"
+              <strong>Natürliche Sprachsteuerung:</strong> Frage zum Beispiel: "Wie groß ist das berechnete Lattenmaß?" oder "Was war das Maß nach 99,8 cm?"
             </AlertDescription>
           </Alert>
         </CardContent>
       </Card>
 
-      {/* Ergebnis-Karte */}
+      {kiAntwort && (
+        <Card>
+          <CardHeader>
+            <CardTitle>KI-Antwort</CardTitle>
+            <CardDescription>
+              Die Antwort der Dachlatten-KI auf deine Frage.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>{kiAntwort}</p>
+            {kiLoading && <p className="text-sm text-muted-foreground">KI antwortet...</p>}
+          </CardContent>
+        </Card>
+      )}
+
       {abstaende.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Ergebnis</CardTitle>
             <CardDescription>
-              Lattenabstände vom Startpunkt
+              Berechnetes Lattenmaß und Abstände.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2">
+              <Badge variant="secondary" className="text-sm">
+                Berechnetes Lattenmaß: {lattenMass.toFixed(1)} cm
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-4">
               {abstaende.map((abstand) => (
                 <Badge key={abstand.nr} variant="secondary" className="text-sm">
                   Latte {abstand.nr}: {abstand.position.toFixed(1)} cm
