@@ -51,7 +51,7 @@ export const TOOLS: Tool[] = [
     description:
       "Optimale Lattenweite für gegebene Sparrenlänge und Ziegeldeckmaß.",
     icon: Ruler,
-    status: "coming-soon",
+    status: "available",
     category: "Dach",
   },
   {

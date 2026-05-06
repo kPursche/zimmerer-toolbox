@@ -1,45 +1,58 @@
 # PROJ-4: Dachlatten- und Pfanneneinteilung
 
-**Status:** Planned
+**Status:** In Progress
 **Priorität:** P0 (MVP)
 **Erstellt:** 2026-05-02
+**Aktualisiert:** 2026-05-06
 
 ## Beschreibung
-Berechnung der gleichmäßigen Einteilung von Dachlatten für einen gegebenen Ziegeltyp (Pfannen). Der Nutzer gibt die Dachflächen-Länge (Traufe bis First), den Ziegeltyp bzw. das Deckmaß ein — die App berechnet die optimale Lattenweite, Anzahl der Latten und die Positionen der Trauf- und Firstlatte.
+Umfassendes Tool für die Berechnung von Dachlatten- und Pfanneneinteilung. Beinhaltet Auswahl von Dachpfannen gängiger Hersteller mit integrierten Produktkatalogen, automatische Berechnung von Lattenmaßen, Pfanneneinteilung in der Breite mit Berücksichtigung von Ortgangsteinen und Gauben/Dachfenstern. Besonderes Feature: Auditive KI-Unterhaltung für Maßausgaben, funktioniert auch bei ausgeschaltetem Bildschirm.
 
 ## User Stories
 
-1. Als Zimmerer gebe ich Trauflänge und Ziegeldeckmaß ein und erhalte die exakte Lattenweite und Lattenanzahl.
-2. Als Nutzer wähle ich einen gängigen Ziegeltyp aus einer Liste oder gebe eigene Deckmaße ein.
-3. Als Nutzer sehe ich ob das Deckmaß im erlaubten Bereich (Min/Max) des Ziegels liegt.
-4. Als Nutzer kann ich die Ergebnisse für mehrere Dachflächen berechnen (z.B. Vorder- und Rückseite).
+1. Als Zimmerer wähle ich Dachpfannen aus Katalogen gängiger Hersteller aus und lade Datenblätter herunter.
+2. Als Nutzer gebe ich Trauf- und Firstdetail ein und erhalte automatisch berechnete Lattenmaße.
+3. Als Nutzer gebe ich Maß und Anzahl Latten ein und erhalte eine Liste aller Lattenabstände.
+4. Als Nutzer kann ich mich auditiv mit der KI unterhalten: "Gebe mir das erste Lattenmaß", "weiter", "welches Maß kam nach 99,8cm".
+5. Als Nutzer funktioniert die auditive Ausgabe auch bei ausgeschaltetem Bildschirm (z.B. auf der Baustelle).
+6. Als Zimmerer berechne ich Pfanneneinteilung in der Breite mit Ortgangsteinen, Deckbreite und Abschnürung (jede 3./4. Pfanne).
+7. Als Nutzer kann ich Gauben und Dachfenster in die Berechnung einbeziehen.
 
 ## Acceptance Criteria
 
-### Eingabe
-- [ ] Sparrenlänge (Traufe bis First) in cm
-- [ ] Deckmaß des Ziegels: Mindest- und Höchstdeckmaß in cm
-- [ ] Optionale Ziegelauswahl aus Voreinstellungsliste (gängige Typen)
-- [ ] Trauflattenabstand (kann vom Standard abweichen)
-- [ ] Anzahl Dachflächen (1–4)
+### Eingabe (Phase 1: Lattenmaß)
+- [ ] Maß der Dachfläche (Traufe bis First) in cm
+- [ ] Anzahl der Latten
+- [ ] Option: Feste Position der 1. Latte (Traufdetail)
+- [ ] Option: Feste Position der letzten Latte (Firstdetail)
 
-### Ausgabe
-- [ ] Optimale Lattenweite in cm (auf 0,1 cm genau)
-- [ ] Anzahl Latten gesamt (je Fläche)
-- [ ] Gleichmäßigkeit: Liegt Lattenweite im erlaubten Deckmaß-Bereich? (Grün/Rot)
-- [ ] Position der Trauflatte und Firstlatte vom Traufpunkt aus
-- [ ] Tabellarische Liste aller Lattenabstände (zusammenklappbar)
+### Ausgabe (Phase 1)
+- [ ] Liste aller Lattenabstände (auditiv und visuell)
+- [ ] KI-Unterhaltung für Maßabfragen
+- [ ] Offline-Audiofunktion (Bildschirm aus)
+
+### Eingabe (Phase 2: Pfannen)
+- [ ] Auswahl Dachpfannen-Hersteller und Typ aus Katalogen
+- [ ] Maße Ortgangsteine und Deckbreite Flächensteine
+- [ ] Abschnürungsintervall (jede n-te Pfanne)
+- [ ] Gauben/Dachfenster-Positionen und -Maße
+
+### Ausgabe (Phase 2)
+- [ ] Vollständige Pfanneneinteilung mit Abschnürungen
+- [ ] Berücksichtigung von Gauben und Dachfenstern
 
 ### UX
-- [ ] Live-Berechnung bei Eingabe
-- [ ] Ampel-Anzeige: Grün = Deckmaß ok, Rot = außerhalb Toleranz
-- [ ] Voreinstellungen für gängige Ziegel (z.B. Frankfurter Pfanne, Biberschwanz)
+- [ ] Auditive KI-Interaktion: Natürliche Sprachbefehle
+- [ ] Offline-Modus für Audio (kein Bildschirm nötig)
+- [ ] Hersteller-Kataloge als herunterladbare PDFs
+- [ ] Live-Berechnung bei Eingabeänderungen
 
 ## Edge Cases
 
-- Sparrenlänge kürzer als ein Deckmaß → Fehlermeldung
-- Deckmaß-Bereich ist 0 (Min = Max) → exakte Berechnung, keine Optimierung
-- Keine ganzzahlige Lattenanzahl möglich → App wählt beste Näherung mit Hinweis
+- Ungleichmäßige Lattenverteilung → Warnung mit Optimierungsvorschlag
+- Gauben überschneiden Latten → automatische Anpassung
+- Audio nicht verfügbar → Fallback auf Text
 
 ## Dependencies
 - Requires: PROJ-1 (App Shell)
+- Requires: PROJ-2 (Auth) für Benutzer-spezifische Kataloge
