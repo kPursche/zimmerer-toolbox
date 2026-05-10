@@ -43,31 +43,50 @@ interface Ergebnis {
   gap: number;
   module: number;
   boards: BoardPos[];
+  sym_err: number; // 0 = perfect symmetry around opening centres
+}
+
+interface Suggestion {
+  ecke_l: Ecke;
+  ecke_r: Ecke;
+  erg: Ergebnis;
 }
 
 // ── Calculation ───────────────────────────────────────────────────────────────
 //
-// Corner combos determine how many boards fit and the u formula.
+// Symmetric framing: the opening centre x_c should land on the centre
+// of a Boden board (phase = b_B/2) or a gap (phase = b_B + gap/2).
+// sym_err is the circular distance to the nearest of these two targets.
 //
-// B-B: (n+1) Boden, n Deckel  → u = ((n+1)·b_B + n·b_D − W) / (2n)
-// D-D: n Boden, (n+1) Deckel  → u = (n·b_B + (n+1)·b_D − W) / (2n)
-// B-D or D-B: n each           → u = (n·(b_B+b_D) − W) / (2n−1)
+// Corner combos and u formulas:
+//   B-B: (n+1) Boden, n Deckel  → u = ((n+1)·b_B + n·b_D − W) / (2n)
+//   D-D: n Boden, (n+1) Deckel  → u = (n·b_B + (n+1)·b_D − W) / (2n)
+//   B-D or D-B: n each           → u = (n·(b_B+b_D) − W) / (2n−1)
 //
-// Board x-offsets:
-//   ecke_l=B: Boden[i] = i·m, Deckel[i] = b_B−u + i·m
-//   ecke_l=D: Boden[i] = b_D−u + i·m, Deckel[i] = i·m
-// where m = b_B + b_D − 2u
+// Board x-offsets (offset = start of first Boden board):
+//   ecke_l=B: offset=0,     Deckel[i] = b_B−u + i·m
+//   ecke_l=D: offset=b_D−u, Deckel[i] = i·m
 
-function solve(
+function openingSymErr(x_c: number, offset: number, m: number, b_B: number): number {
+  const phase = ((x_c - offset) % m + m) % m;
+  const gap = m - b_B;
+  const cdist = (target: number) => Math.min(Math.abs(phase - target), m - Math.abs(phase - target));
+  return Math.min(cdist(b_B / 2), cdist(b_B + gap / 2));
+}
+
+function solveForCorners(
   W: number, b_B: number, b_D: number,
   u_min: number, u_max: number,
   ecke_l: Ecke, ecke_r: Ecke,
+  oeffnungen: ParsedOeffnung[],
 ): Ergebnis | null {
   const combo = `${ecke_l}-${ecke_r}`;
   const maxN = Math.ceil(W / b_B) + 4;
   const u_target = (u_min + u_max) / 2;
+  const hasOeff = oeffnungen.length > 0;
+
   let best: Ergebnis | null = null;
-  let bestDist = Infinity;
+  let bestScore = Infinity;
 
   for (let n = 1; n <= maxN; n++) {
     let u: number, n_B: number, n_D: number;
@@ -79,7 +98,6 @@ function solve(
       u = (n * b_B + (n + 1) * b_D - W) / (2 * n);
       n_B = n; n_D = n + 1;
     } else {
-      // B-D or D-B
       u = (n * (b_B + b_D) - W) / (2 * n - 1);
       n_B = n; n_D = n;
     }
@@ -88,23 +106,34 @@ function solve(
     const gap = b_D - 2 * u;
     if (gap <= 0) continue;
     const m = b_B + gap;
+    const offset = ecke_l === "boden" ? 0 : b_D - u;
+    const dx     = ecke_l === "boden" ? b_B - u : 0;
 
-    const bx = ecke_l === "boden" ? 0 : b_D - u;
-    const dx = ecke_l === "boden" ? b_B - u : 0;
+    // Average symmetry error over all openings
+    let sym_err = 0;
+    if (hasOeff) {
+      for (const o of oeffnungen) sym_err += openingSymErr(o.x + o.breite / 2, offset, m, b_B);
+      sym_err /= oeffnungen.length;
+    }
 
-    const boards: BoardPos[] = [];
-    for (let i = 0; i < n_B; i++) boards.push({ x: bx + i * m, w: b_B, typ: "boden" });
-    for (let i = 0; i < n_D; i++) boards.push({ x: dx + i * m, w: b_D, typ: "deckel" });
-
-    const dist = Math.abs(u - u_target);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = { n_boden: n_B, n_deckel: n_D, u, gap, module: m, boards };
+    // Primary sort key: sym_err; secondary: closeness to u_target
+    const score = hasOeff ? sym_err * 1000 + Math.abs(u - u_target) : Math.abs(u - u_target);
+    if (score < bestScore) {
+      bestScore = score;
+      const boards: BoardPos[] = [];
+      for (let i = 0; i < n_B; i++) boards.push({ x: offset + i * m, w: b_B, typ: "boden" });
+      for (let i = 0; i < n_D; i++) boards.push({ x: dx     + i * m, w: b_D, typ: "deckel" });
+      best = { n_boden: n_B, n_deckel: n_D, u, gap, module: m, boards, sym_err };
     }
   }
 
   return best;
 }
+
+const ALL_CORNER_COMBOS: [Ecke, Ecke][] = [
+  ["boden", "boden"], ["boden", "deckel"],
+  ["deckel", "boden"], ["deckel", "deckel"],
+];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -140,11 +169,6 @@ export function BodenDeckelschaulungTool() {
     return null;
   }, [p]);
 
-  const erg = useMemo(() => {
-    if (fehler) return null;
-    return solve(p.W, p.b_B, p.b_D, p.u_min, p.u_max, eckeL, eckeR);
-  }, [fehler, p, eckeL, eckeR]);
-
   const parsedOeff = useMemo<ParsedOeffnung[]>(() =>
     oeffnungen.map(o => ({
       id: o.id,
@@ -157,6 +181,36 @@ export function BodenDeckelschaulungTool() {
     })),
     [oeffnungen]
   );
+
+  const solveResult = useMemo(() => {
+    if (fehler) return null;
+    const current = solveForCorners(p.W, p.b_B, p.b_D, p.u_min, p.u_max, eckeL, eckeR, parsedOeff);
+
+    // No openings or already perfect → no suggestion needed
+    if (parsedOeff.length === 0 || (current && current.sym_err < 0.1)) {
+      return { current, suggestion: null as Suggestion | null };
+    }
+
+    // Try all other corner combos
+    let bestSuggestion: Suggestion | null = null;
+    for (const [el, er] of ALL_CORNER_COMBOS) {
+      if (el === eckeL && er === eckeR) continue;
+      const r = solveForCorners(p.W, p.b_B, p.b_D, p.u_min, p.u_max, el, er, parsedOeff);
+      if (r && (!bestSuggestion || r.sym_err < bestSuggestion.erg.sym_err)) {
+        bestSuggestion = { ecke_l: el, ecke_r: er, erg: r };
+      }
+    }
+
+    // Only suggest if meaningfully better (≥ 0.05 cm improvement)
+    const suggestion = (bestSuggestion && (!current || bestSuggestion.erg.sym_err < current.sym_err - 0.05))
+      ? bestSuggestion
+      : null;
+
+    return { current, suggestion };
+  }, [fehler, p, eckeL, eckeR, parsedOeff]);
+
+  const erg = solveResult?.current ?? null;
+  const suggestion = solveResult?.suggestion ?? null;
 
   const addOeffnung = () => {
     setOeffnungen(prev => [...prev, {
@@ -267,8 +321,47 @@ export function BodenDeckelschaulungTool() {
               <div className="text-xs text-mu">
                 Modul: {erg.module.toFixed(1)} cm · Ecke links: {eckeL === "boden" ? "Bodenbrett" : "Deckelbrett"} · Ecke rechts: {eckeR === "boden" ? "Bodenbrett" : "Deckelbrett"}
               </div>
+
+              {/* Symmetry indicator — only shown when openings exist */}
+              {parsedOeff.length > 0 && (
+                <div className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
+                  erg.sym_err < 0.1
+                    ? "bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+                    : "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                }`}>
+                  <span>{erg.sym_err < 0.1 ? "✓" : "~"}</span>
+                  <span>
+                    {erg.sym_err < 0.1
+                      ? "Öffnungen gleichmäßig eingefasst"
+                      : `Abweichung zur Symmetrie: ${erg.sym_err.toFixed(1)} cm`}
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Suggestion card */}
+          {suggestion && (
+            <Card className="border-oak/40 bg-oak-alpha/30">
+              <CardContent className="pt-4 pb-4 space-y-3">
+                <p className="text-sm font-semibold text-tx">Bessere Symmetrie möglich</p>
+                <p className="text-xs text-mu leading-relaxed">
+                  Mit <strong>Ecke links: {suggestion.ecke_l === "boden" ? "Bodenbrett" : "Deckelbrett"}</strong>,{" "}
+                  <strong>Ecke rechts: {suggestion.ecke_r === "boden" ? "Bodenbrett" : "Deckelbrett"}</strong> und
+                  Überdeckung {suggestion.erg.u.toFixed(1)} cm{" "}
+                  {suggestion.erg.sym_err < 0.1
+                    ? "ergibt sich eine perfekt symmetrische Einfassung."
+                    : `beträgt die Abweichung nur noch ${suggestion.erg.sym_err.toFixed(1)} cm.`}
+                </p>
+                <button
+                  onClick={() => { setEckeL(suggestion.ecke_l); setEckeR(suggestion.ecke_r); }}
+                  className="rounded-md bg-oak px-4 py-2 text-xs font-semibold text-white hover:bg-oak/90"
+                >
+                  Übernehmen
+                </button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="-mx-4 rounded-none border-x-0 sm:mx-0 sm:rounded-xl sm:border-x">
             <CardHeader className="px-4 pb-2 sm:px-6">
