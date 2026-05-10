@@ -109,12 +109,12 @@ function solve(
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function BodenDeckelschaulungTool() {
-  const [wandbreite, setWandbreite] = useState("4500");
-  const [wandhoehe, setWandhoehe] = useState("2800");
-  const [bodenBreite, setBodenBreite] = useState("160");
-  const [deckelBreite, setDeckelBreite] = useState("80");
-  const [uMin, setUMin] = useState("20");
-  const [uMax, setUMax] = useState("30");
+  const [wandbreite, setWandbreite] = useState("450");
+  const [wandhoehe, setWandhoehe] = useState("280");
+  const [bodenBreite, setBodenBreite] = useState("16");
+  const [deckelBreite, setDeckelBreite] = useState("12");
+  const [uMin, setUMin] = useState("2");
+  const [uMax, setUMax] = useState("3.5");
   const [eckeL, setEckeL] = useState<Ecke>("boden");
   const [eckeR, setEckeR] = useState<Ecke>("boden");
   const [oeffnungen, setOeffnungen] = useState<Oeffnung[]>([]);
@@ -134,7 +134,7 @@ export function BodenDeckelschaulungTool() {
     if (isNaN(p.H) || p.H <= 0) return "Wandhöhe eingeben.";
     if (isNaN(p.b_B) || p.b_B <= 0) return "Brettbreite Boden eingeben.";
     if (isNaN(p.b_D) || p.b_D <= 0) return "Brettbreite Deckel eingeben.";
-    if (isNaN(p.u_min) || p.u_min < 0) return "Überdeckung min ≥ 0 mm.";
+    if (isNaN(p.u_min) || p.u_min < 0) return "Überdeckung min ≥ 0 cm.";
     if (isNaN(p.u_max) || p.u_max < p.u_min) return "Überdeckung max ≥ min.";
     if (p.b_D <= 2 * p.u_min) return "Deckelbreite muss größer als 2 × Überdeckung min sein.";
     return null;
@@ -161,8 +161,8 @@ export function BodenDeckelschaulungTool() {
   const addOeffnung = () => {
     setOeffnungen(prev => [...prev, {
       id: nextId,
-      x_str: "800", breite_str: "900", hoehe_str: "1200",
-      ypos_str: "800", einstand_l_str: "0", einstand_r_str: "0",
+      x_str: "80", breite_str: "90", hoehe_str: "120",
+      ypos_str: "80", einstand_l_str: "0", einstand_r_str: "0",
     }]);
     setNextId(n => n + 1);
   };
@@ -174,12 +174,12 @@ export function BodenDeckelschaulungTool() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Wand</CardTitle>
-          <CardDescription>Alle Maße in mm</CardDescription>
+          <CardDescription>Alle Maße in cm</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-3">
-            <EF label="Breite" einheit="mm" wert={wandbreite} onChange={e => setWandbreite(e.target.value)} min={100} />
-            <EF label="Höhe" einheit="mm" wert={wandhoehe} onChange={e => setWandhoehe(e.target.value)} min={100} />
+            <EF label="Breite" einheit="cm" wert={wandbreite} onChange={e => setWandbreite(e.target.value)} min={100} />
+            <EF label="Höhe" einheit="cm" wert={wandhoehe} onChange={e => setWandhoehe(e.target.value)} min={100} />
           </div>
         </CardContent>
       </Card>
@@ -191,12 +191,12 @@ export function BodenDeckelschaulungTool() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <EF label="Brettbreite Boden" einheit="mm" wert={bodenBreite} onChange={e => setBodenBreite(e.target.value)} min={10} />
-            <EF label="Brettbreite Deckel" einheit="mm" wert={deckelBreite} onChange={e => setDeckelBreite(e.target.value)} min={10} />
+            <EF label="Brettbreite Boden" einheit="cm" wert={bodenBreite} onChange={e => setBodenBreite(e.target.value)} min={10} />
+            <EF label="Brettbreite Deckel" einheit="cm" wert={deckelBreite} onChange={e => setDeckelBreite(e.target.value)} min={10} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <EF label="Überdeckung min" einheit="mm" wert={uMin} onChange={e => setUMin(e.target.value)} min={0} />
-            <EF label="Überdeckung max" einheit="mm" wert={uMax} onChange={e => setUMax(e.target.value)} min={0} />
+            <EF label="Überdeckung min" einheit="cm" wert={uMin} onChange={e => setUMin(e.target.value)} min={0} />
+            <EF label="Überdeckung max" einheit="cm" wert={uMax} onChange={e => setUMax(e.target.value)} min={0} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <EckeSelect label="Ecke links" wert={eckeL} onChange={setEckeL} />
@@ -261,11 +261,11 @@ export function BodenDeckelschaulungTool() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <ErgebnisWert label="Bodenbretter" wert={`${erg.n_boden} Stk.`} />
                 <ErgebnisWert label="Deckelbretter" wert={`${erg.n_deckel} Stk.`} />
-                <ErgebnisWert label="Überdeckung" wert={`${erg.u.toFixed(1)} mm`} highlight />
-                <ErgebnisWert label="Sichtfuge" wert={`${erg.gap.toFixed(1)} mm`} />
+                <ErgebnisWert label="Überdeckung" wert={`${erg.u.toFixed(1)} cm`} highlight />
+                <ErgebnisWert label="Sichtfuge" wert={`${erg.gap.toFixed(1)} cm`} />
               </div>
               <div className="text-xs text-mu">
-                Modul: {erg.module.toFixed(1)} mm · Ecke links: {eckeL === "boden" ? "Bodenbrett" : "Deckelbrett"} · Ecke rechts: {eckeR === "boden" ? "Bodenbrett" : "Deckelbrett"}
+                Modul: {erg.module.toFixed(1)} cm · Ecke links: {eckeL === "boden" ? "Bodenbrett" : "Deckelbrett"} · Ecke rechts: {eckeR === "boden" ? "Bodenbrett" : "Deckelbrett"}
               </div>
             </CardContent>
           </Card>
@@ -351,18 +351,18 @@ function OeffnungCard({
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <EF label="Position von links" einheit="mm" wert={o.x_str} onChange={e => onChange("x_str", e.target.value)} min={0} />
-        <EF label="Breite" einheit="mm" wert={o.breite_str} onChange={e => onChange("breite_str", e.target.value)} min={1} />
+        <EF label="Position von links" einheit="cm" wert={o.x_str} onChange={e => onChange("x_str", e.target.value)} min={0} />
+        <EF label="Breite" einheit="cm" wert={o.breite_str} onChange={e => onChange("breite_str", e.target.value)} min={1} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <EF label="Höhe" einheit="mm" wert={o.hoehe_str} onChange={e => onChange("hoehe_str", e.target.value)} min={1} />
-        <EF label="Unterkante ab Boden" einheit="mm" wert={o.ypos_str} onChange={e => onChange("ypos_str", e.target.value)} min={0} />
+        <EF label="Höhe" einheit="cm" wert={o.hoehe_str} onChange={e => onChange("hoehe_str", e.target.value)} min={1} />
+        <EF label="Unterkante ab Boden" einheit="cm" wert={o.ypos_str} onChange={e => onChange("ypos_str", e.target.value)} min={0} />
       </div>
       <div>
         <p className="mb-2 text-[11px] text-mu">Einstand der Schalung in die Öffnung</p>
         <div className="grid grid-cols-2 gap-3">
-          <EF label="Links" einheit="mm" wert={o.einstand_l_str} onChange={e => onChange("einstand_l_str", e.target.value)} min={0} />
-          <EF label="Rechts" einheit="mm" wert={o.einstand_r_str} onChange={e => onChange("einstand_r_str", e.target.value)} min={0} />
+          <EF label="Links" einheit="cm" wert={o.einstand_l_str} onChange={e => onChange("einstand_l_str", e.target.value)} min={0} />
+          <EF label="Rechts" einheit="cm" wert={o.einstand_r_str} onChange={e => onChange("einstand_r_str", e.target.value)} min={0} />
         </div>
       </div>
     </div>
@@ -487,7 +487,7 @@ function WandSVG({
       <line x1={sx(W)} y1={PAD.t + drawH + 17} x2={sx(W)} y2={PAD.t + drawH + 27} stroke={C_DIM} strokeWidth="0.8" />
       <text x={sx(0) + drawW / 2} y={PAD.t + drawH + 36}
         textAnchor="middle" fontSize="10" fill={C_DIM}>
-        {W} mm
+        {W} cm
       </text>
 
       {/* Dimension: height on left */}
@@ -499,7 +499,7 @@ function WandSVG({
         fontSize="10" fill={C_DIM} textAnchor="middle"
         transform={`rotate(-90, ${sx(0) - 34}, ${PAD.t + drawH / 2})`}
       >
-        {H} mm
+        {H} cm
       </text>
 
       {/* Legend */}
