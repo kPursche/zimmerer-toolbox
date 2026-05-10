@@ -146,7 +146,11 @@ export function BodenDeckelschaulungTool() {
   const [uMax, setUMax] = useState("3.5");
   const [eckeL, setEckeL] = useState<Ecke>("boden");
   const [eckeR, setEckeR] = useState<Ecke>("boden");
+  const [prevEcken, setPrevEcken] = useState<{ ecke_l: Ecke; ecke_r: Ecke } | null>(null);
   const [oeffnungen, setOeffnungen] = useState<Oeffnung[]>([]);
+
+  const changeEckeL = (v: Ecke) => { setPrevEcken(null); setEckeL(v); };
+  const changeEckeR = (v: Ecke) => { setPrevEcken(null); setEckeR(v); };
   const [nextId, setNextId] = useState(1);
 
   const p = useMemo(() => ({
@@ -253,9 +257,21 @@ export function BodenDeckelschaulungTool() {
             <EF label="Überdeckung max" einheit="cm" wert={uMax} onChange={e => setUMax(e.target.value)} min={0} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <EckeSelect label="Ecke links" wert={eckeL} onChange={setEckeL} />
-            <EckeSelect label="Ecke rechts" wert={eckeR} onChange={setEckeR} />
+            <EckeSelect label="Ecke links" wert={eckeL} onChange={changeEckeL} />
+            <EckeSelect label="Ecke rechts" wert={eckeR} onChange={changeEckeR} />
           </div>
+          {prevEcken && (
+            <button
+              onClick={() => {
+                setEckeL(prevEcken.ecke_l);
+                setEckeR(prevEcken.ecke_r);
+                setPrevEcken(null);
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-s2 px-3 py-2 text-xs font-semibold text-mu hover:bg-s3 hover:text-tx"
+            >
+              ↩ Rückgängig: Ecke links {prevEcken.ecke_l === "boden" ? "Boden" : "Deckel"} · rechts {prevEcken.ecke_r === "boden" ? "Boden" : "Deckel"}
+            </button>
+          )}
         </CardContent>
       </Card>
 
@@ -354,7 +370,11 @@ export function BodenDeckelschaulungTool() {
                     : `beträgt die Abweichung nur noch ${suggestion.erg.sym_err.toFixed(1)} cm.`}
                 </p>
                 <button
-                  onClick={() => { setEckeL(suggestion.ecke_l); setEckeR(suggestion.ecke_r); }}
+                  onClick={() => {
+                    setPrevEcken({ ecke_l: eckeL, ecke_r: eckeR });
+                    setEckeL(suggestion.ecke_l);
+                    setEckeR(suggestion.ecke_r);
+                  }}
                   className="rounded-md bg-oak px-4 py-2 text-xs font-semibold text-white hover:bg-oak/90"
                 >
                   Übernehmen
