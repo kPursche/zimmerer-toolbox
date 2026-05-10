@@ -69,7 +69,7 @@ export const TOOLS: Tool[] = [
     description:
       "Einteilung der Boden- und Deckbretter für eine gleichmäßige Schalung aus Gesamtbreite und Brettmaßen.",
     icon: Columns2,
-    status: "coming-soon",
+    status: "available",
     category: "Holz",
   },
   {

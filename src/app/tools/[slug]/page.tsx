@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TOOLS, getToolBySlug } from "@/lib/tools";
 import { GauenwangenTool } from "@/components/tools/gauenwangen";
 import { LatteneinteilungTool } from "@/components/tools/latteneinteilung";
+import { BodenDeckelschaulungTool } from "@/components/tools/boden-deckelschalung";
 
 interface ToolPageProps {
   params: Promise<{ slug: string }>;
@@ -81,6 +82,8 @@ export default async function ToolPage({ params }: ToolPageProps) {
         <GauenwangenTool />
       ) : slug === "latteneinteilung" ? (
         <LatteneinteilungTool />
+      ) : slug === "boden-deckelschalung" ? (
+        <BodenDeckelschaulungTool />
       ) : (
         <Card className="border-dashed bg-s1/60">
           <CardHeader>
