@@ -33,6 +33,7 @@ export interface Tool {
   icon: LucideIcon;
   status: ToolStatus;
   category: ToolCategory;
+  whatsNext?: string[];
 }
 
 export const TOOLS: Tool[] = [
@@ -44,6 +45,9 @@ export const TOOLS: Tool[] = [
     icon: Triangle,
     status: "available",
     category: "Dach",
+    whatsNext: [
+      "Zuschnittplan für Platten an der Wange.",
+    ],
   },
   {
     slug: "latteneinteilung",
@@ -53,6 +57,11 @@ export const TOOLS: Tool[] = [
     icon: Ruler,
     status: "available",
     category: "Dach",
+    whatsNext: [
+      "Pfannenauswahl: weitere Hersteller werden aktiviert (Erlus, Röben, Wienerberger …)",
+      "Für die Dacheinteilung werden die Daten des ausgewählten Models übertragen.",
+      "Automatische Materialliste.",
+    ],
   },
   {
     slug: "boden-deckelschalung",

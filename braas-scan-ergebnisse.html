@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Braas – Technische Daten (Scan-Ergebnisse)</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 11px; margin: 20mm 15mm; color: #111; }
+    h1 { font-size: 16px; margin-bottom: 4px; }
+    p.meta { font-size: 10px; color: #555; margin-bottom: 16px; }
+    h2 { font-size: 12px; margin: 20px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+    th { background: #eee; text-align: left; padding: 3px 6px; font-size: 10px; border: 1px solid #bbb; }
+    td { padding: 3px 6px; border: 1px solid #ddd; vertical-align: top; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    .ok   { background: #e8f5e9; }
+    .warn { background: #fff8e1; }
+    .laf-list { white-space: nowrap; }
+    .note { font-size: 9px; color: #888; font-style: italic; }
+    @media print {
+      body { margin: 10mm 12mm; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Braas Dachziegel und Dachsteine – Technische Daten</h1>
+<p class="meta">
+  Extrahiert via pdfjs-dist aus den offiziellen Braas Datenblättern (PDF-Textschicht) · Erstellt 2026-05-09<br>
+  <strong>Bitte manuell gegen die originalen Datenblätter abgleichen!</strong>
+  Werte aus Bildebene (z.B. Tabellen als Grafik) konnten nicht automatisch extrahiert werden.
+</p>
+
+<h2>Dachsteine (Beton) – LAF fest 40 mm</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)</th>
+      <th>LA max (mm)</th>
+      <th>PÜT min (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base (mm)<br><span class="note">LAT = lat_base − PÜT</span></th>
+      <th>LAF (mm)</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Frankfurter Pfanne</td>
+      <td>312</td>
+      <td>345</td>
+      <td>0</td>
+      <td>80</td>
+      <td>400 → LAT 400–320</td>
+      <td>40 (fest)</td>
+      <td>LA-Tabelle: &lt;22°: 312–320 / 22–30°: 312–335 / &gt;30°: 312–345</td>
+    </tr>
+    <tr class="warn">
+      <td>Tegalit</td>
+      <td>312</td>
+      <td>340</td>
+      <td>0</td>
+      <td>80</td>
+      <td>400 → LAT 400–320</td>
+      <td>40 (fest)</td>
+      <td>LA-Tabelle: &lt;25°: 312–315 / 25–35°: 312–325 / &gt;35°: 312–340<br>
+        <span class="note">⚠ Grenzwerte enger als Frankfurter Pfanne – bitte prüfen</span></td>
+    </tr>
+    <tr class="ok">
+      <td>Taunus Pfanne</td>
+      <td>312</td>
+      <td>345</td>
+      <td>0</td>
+      <td>80</td>
+      <td>400 → LAT 400–320</td>
+      <td>40 (fest)</td>
+      <td>PDF: „Variable Decklänge: 312–345 mm" explizit genannt</td>
+    </tr>
+    <tr class="ok">
+      <td>Doppel-S</td>
+      <td>312</td>
+      <td>345</td>
+      <td>0</td>
+      <td>80</td>
+      <td>400 → LAT 400–320</td>
+      <td>40 (fest)</td>
+      <td>LA-Tabelle: &lt;22°: 312–320 / 22–30°: 312–335 / &gt;30°: 312–345</td>
+    </tr>
+    <tr class="ok">
+      <td>Harzer Pfanne</td>
+      <td>312</td>
+      <td>345</td>
+      <td>0</td>
+      <td>80</td>
+      <td>400 → LAT 400–320</td>
+      <td>40 (fest)</td>
+      <td>LA-Tabelle: &lt;22°: 312–320 / 22–30°: 312–335 / &gt;30°: 312–345</td>
+    </tr>
+    <tr class="ok">
+      <td>Harzer Pfanne 7</td>
+      <td>372</td>
+      <td>405</td>
+      <td>0</td>
+      <td>80</td>
+      <td>460 → LAT 460–380</td>
+      <td>40 (fest)</td>
+      <td>LA-Tabelle: &lt;22°: 372–380 / 22–30°: 372–395 / &gt;30°: 372–405</td>
+    </tr>
+    <tr class="ok">
+      <td>Harzer Pfanne F+</td>
+      <td>365</td>
+      <td>375</td>
+      <td>0</td>
+      <td>80</td>
+      <td>460 → LAT 460–380</td>
+      <td>40 (fest)</td>
+      <td>PDF: „Variable Decklänge: 365–375 mm" explizit; Sondermodell 7–12°</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Dachziegel (Ton) – Rubin</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)</th>
+      <th>LA max (mm)</th>
+      <th>PÜT min (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base (mm)</th>
+      <th>LAF-Tabelle (Konischer First P)</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Rubin 9V</td>
+      <td>370</td>
+      <td>400</td>
+      <td>0</td>
+      <td>80</td>
+      <td>430 → LAT 430–350</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 30 mm<br>&gt;45°: 20 mm</td>
+      <td>PDF: „LA = 370–400 mm" und „PÜT/LAT: 0–80 / 430–350 mm"<br>
+        LAF: Sattelfirst O – Text extrahiert (40/30/20)</td>
+    </tr>
+    <tr class="ok">
+      <td>Rubin 11V</td>
+      <td>338</td>
+      <td>373</td>
+      <td>0</td>
+      <td>80</td>
+      <td>403 → LAT 403–323</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 30 mm<br>&gt;45°: 20 mm</td>
+      <td>PDF: „Variable Decklänge: 338–373 mm" und „PÜT/LAT: 0–80 / 403–323 mm"<br>
+        LAF: Konischer First P – Text vollständig extrahiert ✓</td>
+    </tr>
+    <tr class="warn">
+      <td>Rubin 13V</td>
+      <td>330</td>
+      <td>360</td>
+      <td>–</td>
+      <td>–</td>
+      <td>–</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 30 mm<br>&gt;45°: 20 mm</td>
+      <td>PDF: „Variable Decklänge: 330–360 mm" ✓<br>
+        <span class="note">⚠ PÜT/LAT nur als Grafik im PDF – kein Text extrahierbar.<br>
+        lat_base fehlt! Bitte manuell aus dem Datenblatt prüfen.</span><br>
+        LAF: Sattelfirst HO mit Flächenziegeln (Text: 40/30/20)</td>
+    </tr>
+    <tr class="ok">
+      <td>Rubin 15V</td>
+      <td>330</td>
+      <td>350</td>
+      <td>0</td>
+      <td>80</td>
+      <td>405 → LAT 405–325</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 30 mm<br>&gt;45°: 20 mm</td>
+      <td>PDF: „Variable Decklänge: 330–350 mm" und „PÜT/LAT: 0–80 / 405–325 mm"<br>
+        <span class="note">⚠ LAF-Tabelle nur als Grafik – Werte von Rubin 13V übernommen</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Dachziegel (Ton) – Achat</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)</th>
+      <th>LA max (mm)</th>
+      <th>PÜT min (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base (mm)</th>
+      <th>LAF-Tabelle (Konischer First P)</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Achat 12V</td>
+      <td>330</td>
+      <td>360</td>
+      <td>0</td>
+      <td>80</td>
+      <td>410 → LAT 410–330</td>
+      <td class="laf-list">≤10°: 50 mm<br>≤20°: 40 mm<br>≤30°: 35 mm<br>≤40°: 30 mm<br>≤50°: 25 mm<br>&gt;50°: 25 mm</td>
+      <td>PDF: „Variable Decklänge: 330–360 mm" und „PÜT/LAT: 0–80 / 410–330 mm"<br>
+        LAF-Tabelle 6-stufig vollständig extrahiert ✓</td>
+    </tr>
+    <tr class="ok">
+      <td>Achat 14 Geradschnitt</td>
+      <td>334</td>
+      <td>356</td>
+      <td>0</td>
+      <td>80</td>
+      <td>414 → LAT 414–334</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 35 mm<br>&gt;45°: 30 mm</td>
+      <td>PDF: „la = 334–356 mm" und „PÜT/LAT: 0–80 / 414–334 mm"<br>
+        LAF: Konischer First P vollständig extrahiert ✓</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Dachziegel (Ton) – Granat</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)</th>
+      <th>LA max (mm)</th>
+      <th>PÜT min (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base (mm)</th>
+      <th>LAF-Tabelle</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Granat 11V</td>
+      <td>338</td>
+      <td>380</td>
+      <td>0</td>
+      <td>80</td>
+      <td>415 → LAT 415–335</td>
+      <td class="laf-list">≤30°: 45 mm<br>≤45°: 35 mm<br>&gt;45°: 25 mm</td>
+      <td>PDF: „LA = 338–380 mm" und „PÜT/LAT: 0–80 / 415–335 mm"<br>
+        LAF: Konischer First K und Linienfirst K identisch (45/35/25) ✓</td>
+    </tr>
+    <tr class="warn">
+      <td>Granat 13V</td>
+      <td>330</td>
+      <td>360</td>
+      <td>0</td>
+      <td>80</td>
+      <td>400 → LAT 400–320</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 30 mm<br>&gt;45°: 20 mm</td>
+      <td>PDF: „LA = 330–360 mm" und „PÜT/LAT: 0–80 / 400–320 mm"<br>
+        LAF: Sattelfirst HO mit Flächenziegeln (40/30/20) ✓<br>
+        <span class="note">Sattelfirst HO mit Firstanschlusspfannen hat andere Werte (55/50/40/35/30/25/25/20 per 10°-Stufen)</span></td>
+    </tr>
+    <tr class="ok">
+      <td>Granat 15</td>
+      <td>338</td>
+      <td>350</td>
+      <td>0</td>
+      <td>80</td>
+      <td>380 → LAT 380–300</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 35 mm<br>&gt;45°: 30 mm</td>
+      <td>PDF: „Variable Decklänge: 338–350 mm" und „PÜT/LAT: 0–80 / 380–300 mm"<br>
+        LAF: Konischer First P vollständig extrahiert ✓</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Dachziegel (Ton) – Topas</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)</th>
+      <th>LA max (mm)</th>
+      <th>PÜT min (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base (mm)</th>
+      <th>LAF-Tabelle</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Topas 11V</td>
+      <td>320</td>
+      <td>380</td>
+      <td>0</td>
+      <td>80</td>
+      <td>415 → LAT 415–335</td>
+      <td class="laf-list">≤30°: 45 mm<br>≤45°: 35 mm<br>&gt;45°: 25 mm</td>
+      <td>PDF: „la = 320–380 mm" und „PÜT/LAT: 0–80 / 415–335 mm"<br>
+        LAF: Konischer First K vollständig extrahiert ✓</td>
+    </tr>
+    <tr class="ok">
+      <td>Topas 13V</td>
+      <td>320</td>
+      <td>360</td>
+      <td>0</td>
+      <td>80</td>
+      <td>390 → LAT 390–310</td>
+      <td class="laf-list">≤30°: 40 mm<br>≤45°: 30 mm<br>&gt;45°: 20 mm</td>
+      <td>PDF: „LA = 320–360 mm" und „PÜT/LAT: 0–80 / 390–310 mm"<br>
+        LAF: Sattelfirst HO mit Flächenziegeln (40/30/20) ✓<br>
+        <span class="note">Konischer First HO: ≤30°: 15 mm, ≤45°: 15 mm, &gt;45°: nicht definiert</span></td>
+    </tr>
+    <tr class="ok">
+      <td>Topas 15V</td>
+      <td>320</td>
+      <td>350</td>
+      <td>0</td>
+      <td>80</td>
+      <td>365 → LAT 365–285</td>
+      <td class="laf-list">&lt;30°: 45 mm<br>≤45°: 40 mm<br>&gt;45°: 30 mm</td>
+      <td>PDF: „Variable Decklänge: 320–350 mm" und „PÜT/LAT: 0–80 / 365–285 mm"<br>
+        LAF: Konischer First P vollständig extrahiert ✓<br>
+        <span class="note">Achtung: &lt;30° (nicht ≤30°) – bei genau 30° gilt 40 mm</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Dachziegel (Ton) – Turmalin und Saphir</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)</th>
+      <th>LA max (mm)</th>
+      <th>PÜT min (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base (mm)</th>
+      <th>LAF-Tabelle (Linienfirst K / Konischer First P)</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Turmalin</td>
+      <td>355</td>
+      <td>380</td>
+      <td>0</td>
+      <td>80</td>
+      <td>445 → LAT 445–365</td>
+      <td class="laf-list">≤30°: 45 mm<br>≤45°: 40 mm<br>&gt;45°: 35 mm</td>
+      <td>PDF: „Variable Decklänge: 355–380 mm" und „PÜT/LAT: 0–80 / 445–365 mm"<br>
+        LAF: Linienfirst K vollständig extrahiert ✓</td>
+    </tr>
+    <tr class="ok">
+      <td>Saphir</td>
+      <td>335</td>
+      <td>345</td>
+      <td>0</td>
+      <td>80</td>
+      <td>405 → LAT 405–325</td>
+      <td class="laf-list">≤30°: 45 mm<br>≤45°: 40 mm<br>&gt;45°: 30 mm</td>
+      <td>PDF: „Variable Decklänge: 335–345 mm" und „PÜT/LAT: 0–80 / 405–325 mm"<br>
+        LAF: Konischer First P vollständig extrahiert ✓</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Biberschwanz – Opal (Doppeldeckung)</h2>
+<p style="font-size:10px; margin-bottom:6px;">
+  Sonderkonstruktion: LAT1 variabel (= lat_base − PÜT), LAT2 = 120 mm fest (zweite Trauflatte).<br>
+  LA = Deckabstand in Doppeldeckung. PÜT max = 40 mm (nicht 80 mm wie bei Falzziegeln).
+</p>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)<br><span class="note">Doppeldeckung</span></th>
+      <th>LA max (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base / LAT1 (mm)</th>
+      <th>LAT2 fest (mm)</th>
+      <th>LAF-Tabelle (Konischer First HO)</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Opal</td>
+      <td>145</td>
+      <td>165</td>
+      <td>40</td>
+      <td>215 → LAT1 215–175</td>
+      <td>120</td>
+      <td class="laf-list">≤30°: 100 mm<br>≤45°: 90–100 mm<br>&gt;45°: 75–90 mm<br>
+        <span class="note">Firstziegel klein HO:<br>≤30°: 85 / ≤45°: 75–85 / &gt;45°: 65–75</span></td>
+      <td>PDF: „Variable Decklänge: 145–165 mm (Doppeldeckung) / 290–330 mm (Kronendeckung)"<br>
+        „PÜT/LAT1: 0–40 / 215–175 mm" · „LAT2 = 120 mm"<br>
+        <span class="note">⚠ LAF-Werte als Bereiche angegeben – Mittelwert oder Untergrenze verwenden?</span></td>
+    </tr>
+    <tr class="ok">
+      <td>Opal Berliner Biber</td>
+      <td>145</td>
+      <td>165</td>
+      <td>40</td>
+      <td>215 → LAT1 215–175</td>
+      <td>120</td>
+      <td class="laf-list">≤30°: 100 mm<br>≤45°: 90 mm<br>&gt;45°: 75 mm</td>
+      <td>Gleiche Konstruktion wie Opal; schmalere Deckbreite (155 mm statt 180 mm)</td>
+    </tr>
+    <tr class="ok">
+      <td>Opal Kirchenbiber</td>
+      <td>145</td>
+      <td>165</td>
+      <td>40</td>
+      <td>215 → LAT1 215–175</td>
+      <td>120</td>
+      <td class="laf-list">≤30°: 100 mm<br>≤45°: 90 mm<br>&gt;45°: 75 mm</td>
+      <td>PDF: „PÜT/LAT1: 0–40 / 215–175 mm" ✓</td>
+    </tr>
+    <tr class="warn">
+      <td>Opal Turmbiber</td>
+      <td>145</td>
+      <td>165</td>
+      <td>40</td>
+      <td>190 → LAT1 190–150</td>
+      <td>155</td>
+      <td class="laf-list">≤30°: 85 mm<br>≤45°: 80–85 mm<br>&gt;45°: 70–75 mm</td>
+      <td>PDF: „PÜT/LAT1: 0–40 / 190–150 mm" · „LAT2 = 155 mm"<br>
+        <span class="note">⚠ LA-Werte pitch-abhängig – Grenzwerte nur geschätzt</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Biberschwanz – Smaragd</h2>
+<p style="font-size:10px; margin-bottom:6px;">
+  Sonderkonstruktion: LAT1 variabel, LAT2 = 180 mm fest. PÜT max = 80 mm.
+</p>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min (mm)</th>
+      <th>LA max (mm)</th>
+      <th>PÜT max (mm)</th>
+      <th>lat_base / LAT1 (mm)</th>
+      <th>LAT2 fest (mm)</th>
+      <th>LAF-Tabelle (Linienfirst N)</th>
+      <th>Quelle / Bemerkung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="ok">
+      <td>Smaragd</td>
+      <td>165</td>
+      <td>185</td>
+      <td>80</td>
+      <td>260 → LAT1 260–180</td>
+      <td>180</td>
+      <td class="laf-list">≤16°: 50 mm<br>≤30°: 45 mm<br>≤45°: 40 mm<br>&gt;45°: 35 mm</td>
+      <td>PDF: „la = 165–185 mm" und „PÜT/LAT1: 0–80 / 260–180 mm" · „LAT2 = 180 mm"<br>
+        LAF: Linienfirst N 4-stufig vollständig extrahiert ✓</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Zusammenfassung: Vertrauensniveau der extrahierten Werte</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Modell</th>
+      <th>LA min/max</th>
+      <th>PÜT/LAT (lat_base)</th>
+      <th>LAF-Tabelle</th>
+      <th>Gesamtbewertung</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Frankfurter Pfanne</td><td>Text ✓</td><td>Text ✓</td><td>Text (fest 40) ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Tegalit</td><td>Text ✓ (engere Grenzen)</td><td>Text ✓</td><td>Text (fest 40) ✓</td><td class="warn">prüfen (Grenzen)</td></tr>
+    <tr><td>Taunus Pfanne</td><td>Text explizit ✓</td><td>Text ✓</td><td>Text (fest 40) ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Doppel-S</td><td>Text ✓</td><td>Text ✓</td><td>Text (fest 40) ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Harzer Pfanne</td><td>Text ✓</td><td>Text ✓</td><td>Text (fest 40) ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Harzer Pfanne 7</td><td>Text ✓</td><td>Text ✓</td><td>Text (fest 40) ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Harzer Pfanne F+</td><td>Text explizit ✓</td><td>Text ✓</td><td>Text (fest 40) ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Rubin 9V</td><td>Text ✓</td><td>Text ✓</td><td>Text (Sattelfirst O) ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Rubin 11V</td><td>Text explizit ✓</td><td>Text ✓</td><td>Text vollständig ✓</td><td class="ok">sehr gut</td></tr>
+    <tr><td>Rubin 13V</td><td>Text ✓</td><td>⚠ nur Grafik – fehlt!</td><td>Text ✓</td><td class="warn">lat_base prüfen!</td></tr>
+    <tr><td>Rubin 15V</td><td>Text ✓</td><td>Text ✓</td><td>⚠ nur Grafik – von 13V übernommen</td><td class="warn">LAF prüfen</td></tr>
+    <tr><td>Achat 12V</td><td>Text ✓</td><td>Text ✓</td><td>Text 6-stufig ✓</td><td class="ok">sehr gut</td></tr>
+    <tr><td>Achat 14</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Granat 11V</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Granat 13V</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Granat 15</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Topas 11V</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Topas 13V</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Topas 15V</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Opal</td><td>Text ✓</td><td>Text ✓</td><td>Text (Bereiche) ⚠</td><td class="warn">LAF-Bereiche prüfen</td></tr>
+    <tr><td>Opal Berliner Biber</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Opal Kirchenbiber</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Opal Turmbiber</td><td>⚠ geschätzt</td><td>Text ✓</td><td>Text (Bereiche) ⚠</td><td class="warn">LA + LAF prüfen</td></tr>
+    <tr><td>Smaragd</td><td>Text ✓</td><td>Text ✓</td><td>Text 4-stufig ✓</td><td class="ok">sehr gut</td></tr>
+    <tr><td>Turmalin</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+    <tr><td>Saphir</td><td>Text ✓</td><td>Text ✓</td><td>Text ✓</td><td class="ok">gut</td></tr>
+  </tbody>
+</table>
+
+<p style="margin-top:20px; font-size:10px; color:#666;">
+  Alle Werte aus den PDFs extrahiert via pdfjs-dist (Textschicht). Werte die nur als Bildtabelle im PDF vorliegen
+  wurden als nicht extrahierbar gekennzeichnet oder aus vergleichbaren Modellen übernommen.<br>
+  Erstellt: 2026-05-09 · zimmerer-toolbox
+</p>
+
+</body>
+</html>

@@ -54,3 +54,38 @@
     text-transform: uppercase;
   }
 }
+
+@media print {
+  /* Dunkles Theme auf Weiß umkehren */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 5%;
+    --card: 0 0% 97%;
+    --card-foreground: 0 0% 5%;
+    --primary: 32 55% 35%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 5%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 38%;
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 5%;
+    --border: 0 0% 0% / 0.15;
+  }
+
+  html { color-scheme: light; }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Abstände straffen */
+  .space-y-6 > * + * { margin-top: 0.75rem !important; }
+
+  /* Badges immer mit Rand, damit sie sichtbar bleiben */
+  [data-slot="badge"] { border: 1px solid currentColor !important; }
+}

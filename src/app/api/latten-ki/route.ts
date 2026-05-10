@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-type ChatCompletionRequestMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
-};
-
 export async function POST(req: NextRequest) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: "OPENAI_API_KEY nicht konfiguriert" }, { status: 500 });
@@ -17,6 +12,7 @@ export async function POST(req: NextRequest) {
     gesamtMass: number | null;
     anzahlLatten: number | null;
     lattenMass: number | null;
+    letzteLatte: number | null;
     abstaende: Array<{ nr: number; position: number }>;
   } | undefined;
 
@@ -26,36 +22,57 @@ export async function POST(req: NextRequest) {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const systemPrompt = `Du bist ein deutscher Assistent für Dachlatten-Einteilung. Antworte immer kurz und präzise, ohne lange Erklärungen. Verwende bei Bedarf die aktuellen Rechnungsdaten aus dem Kontext. Gib nur die notwendigen Informationen.`;
-  const contextLines = [];
+  const positionenText = context?.abstaende?.length
+    ? context.abstaende.map((a) => `Latte ${a.nr}: ${a.position.toFixed(1)} cm`).join(", ")
+    : "noch nicht berechnet";
 
-  if (context?.gesamtMass != null && context?.anzahlLatten != null && context?.lattenMass != null) {
-    contextLines.push(`Aktuelle Berechnung: Gesamtmaß ${context.gesamtMass.toFixed(1)} cm, Anzahl Latten ${context.anzahlLatten}, berechnetes Lattenmaß ${context.lattenMass.toFixed(1)} cm.`);
-  }
+  const systemPrompt = `Du bist ein sprachgesteuerter Assistent für Dachlatten-Einteilung auf der Baustelle.
+Antworte IMMER als JSON mit genau zwei Feldern: {"text": "...", "letzteLatte": N}
 
-  if (context?.abstaende && context.abstaende.length > 0) {
-    const positions = context.abstaende.map((a) => `Latte ${a.nr}: ${a.position.toFixed(1)} cm`).join("; ");
-    contextLines.push(`Positionen: ${positions}.`);
-  }
+Regeln für text:
+- Maximal 1 kurzer Satz. Nur die direkt gefragte Zahl nennen.
+- Niemals alle Positionen aufzählen.
+- Beispiel: "Latte 8 steht auf 186,5 Zentimeter."
 
-  const messages: ChatCompletionRequestMessage[] = [
-    { role: "system", content: systemPrompt },
-    {
-      role: "user",
-      content: `${contextLines.join(" ")} Bitte beantworte die folgende Frage auf Deutsch: ${prompt}`,
-    },
-  ];
+Regeln für letzteLatte:
+- Die Nummer der Latte, über die text spricht. null wenn keine bestimmte Latte.
+
+Befehle:
+- "nächste" / "weiter" / "und weiter" → letzteLatte + 1 (oder Latte 1 wenn letzteLatte null)
+- "vorherige" / "zurück" → letzteLatte - 1
+- "erste" → Latte 1, "letzte" → höchste Lattennummer
+
+Aktuelle Berechnung:
+- Gesamtmaß: ${context?.gesamtMass != null ? context.gesamtMass.toFixed(1) + " cm" : "unbekannt"}
+- Anzahl Latten: ${context?.anzahlLatten ?? "unbekannt"}
+- Lattenmaß: ${context?.lattenMass != null ? context.lattenMass.toFixed(1) + " cm" : "unbekannt"}
+- Zuletzt genannte Latte: ${context?.letzteLatte ?? "keine"}
+- Positionen: ${positionenText}`;
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages,
-      temperature: 0.2,
-      max_tokens: 250,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 100,
     });
 
-    const text = completion.choices?.[0]?.message?.content?.trim() ?? "Ich konnte leider keine Antwort generieren.";
-    return NextResponse.json({ text });
+    const raw = completion.choices?.[0]?.message?.content?.trim() ?? "{}";
+    let parsed: { text?: string; letzteLatte?: number | null };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = { text: raw, letzteLatte: null };
+    }
+
+    return NextResponse.json({
+      text: parsed.text ?? "Ich konnte leider keine Antwort generieren.",
+      letzteLatte: parsed.letzteLatte ?? null,
+    });
   } catch (error) {
     console.error("[latten-ki] OpenAI-Fehler:", error);
     return NextResponse.json({ error: "KI-Verarbeitung fehlgeschlagen" }, { status: 502 });

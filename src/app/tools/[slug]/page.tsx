@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { BackLink } from "@/components/back-link";
 import { PageHeader } from "@/components/page-header";
+import { WhatsNext } from "@/components/whats-next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TOOLS, getToolBySlug } from "@/lib/tools";
@@ -69,6 +70,12 @@ export default async function ToolPage({ params }: ToolPageProps) {
           <PageHeader title={tool.name} description={tool.description} />
         </div>
       </div>
+
+      {tool.whatsNext?.length ? (
+        <div className="mb-6">
+          <WhatsNext items={tool.whatsNext} />
+        </div>
+      ) : null}
 
       {slug === "gauenwangen" ? (
         <GauenwangenTool />

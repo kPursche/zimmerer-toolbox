@@ -87,11 +87,15 @@ export function CommunityFeed() {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     setSending(true);
-    await supabase.from("community_feed").insert({
-      name: name.trim() || "Anonym",
-      message: trimmed,
-      reply_to: replyTo?.id ?? null,
-      session_id: sessionId,
+    await fetch("/api/community/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim() || "Anonym",
+        message: trimmed,
+        reply_to: replyTo?.id ?? null,
+        session_id: sessionId,
+      }),
     });
     setText("");
     setReplyTo(null);
