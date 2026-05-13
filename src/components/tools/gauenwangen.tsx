@@ -65,11 +65,12 @@ interface Ergebnis {
 }
 
 interface PlattenEingaben {
-  platteBreite:    string; // cm, default 250
-  platteHoehe:     string; // cm, default 62.5
-  ersteReiheHoehe: string; // cm, leer = wie platteHoehe
-  ueberstand:      string; // cm, horizontal, default 0
-  mindestversatz:  string; // cm, Mindestabstand der Stossfugen zu Reihe darunter
+  platteBreite:    string;
+  platteHoehe:     string;
+  ersteReiheHoehe: string;
+  ueberstand:      string;
+  mindestversatz:  string;
+  verlegeart:      'schraeg' | 'waagerecht';
 }
 
 
@@ -184,7 +185,7 @@ const p = useMemo(() => ({
     return berechne(p.hvorne, p.alpha, p.gamma, p.b, p.t, p.achsabstand);
   }, [fehler, p]);
 
-  const [ep, setEp] = useState<PlattenEingaben>({ platteBreite: '250', platteHoehe: '62.5', ersteReiheHoehe: '', ueberstand: '0', mindestversatz: '0' });
+  const [ep, setEp] = useState<PlattenEingaben>({ platteBreite: '250', platteHoehe: '62.5', ersteReiheHoehe: '', ueberstand: '0', mindestversatz: '0', verlegeart: 'schraeg' });
   const setzeP = useCallback(
     (key: keyof PlattenEingaben) => (ev: React.ChangeEvent<HTMLInputElement>) =>
       setEp(prev => ({ ...prev, [key]: ev.target.value })),
@@ -193,6 +194,46 @@ const p = useMemo(() => ({
 
   const plattenErg = useMemo(() => {
     if (fehler) return null;
+
+    if (ep.verlegeart === 'waagerecht') {
+      const tanA = Math.tan(toRad(p.alpha));
+      const pb   = parseFloat(ep.platteBreite) || 250;
+      const ph0  = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
+      const phN  = parseFloat(ep.platteHoehe) || 62.5;
+      const uH   = parseFloat(ep.ueberstand) || 0;
+      const mv   = parseFloat(ep.mindestversatz) || 0;
+
+      type RowErgW = { r: number; la: number; laRaw: number; abschnitt: number };
+      const rowsW: RowErgW[] = [];
+      let coY = 0;
+      let firstLen: number | null = null;
+      let prevJointOffset = 0;
+
+      for (let r = 0; r < 60; r++) {
+        const ph   = r === 0 ? ph0 : phN;
+        const sEnd = (coY + ph) / tanA;
+        if (sEnd <= 0.1) break;
+
+        const laRaw: number = firstLen ?? pb;
+        if (firstLen !== null && laRaw <= 0) break;
+
+        const la: number = r === 0
+          ? laRaw
+          : applyMindestversatz(laRaw, prevJointOffset, pb, mv);
+
+        let s: number = -uH + la;
+        while (s < sEnd) s += pb;
+        const abschnitt: number = s - sEnd;
+
+        rowsW.push({ r, la, laRaw, abschnitt });
+        coY             += ph;
+        prevJointOffset  = r === 0 ? 0 : la;
+        firstLen         = abschnitt - 5;
+        if (coY >= p.hvorne) break;
+      }
+      return rowsW;
+    }
+
     const cosA  = Math.cos(toRad(p.alpha));
     const tanG  = Math.tan(toRad(p.gamma));
     const cosG  = Math.cos(toRad(p.gamma));
@@ -399,6 +440,22 @@ const p = useMemo(() => ({
               <CardDescription>Beplankung der Gaubenwange</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
+              <div className="flex overflow-hidden rounded-md border border-border">
+                {(['schraeg', 'waagerecht'] as const).map((art) => (
+                  <button
+                    key={art}
+                    type="button"
+                    onClick={() => setEp(prev => ({ ...prev, verlegeart: art }))}
+                    className={`flex-1 px-3 py-2 text-sm font-semibold transition-colors ${
+                      ep.verlegeart === art
+                        ? 'bg-oak text-white'
+                        : 'bg-s2 text-mu hover:text-tx'
+                    }`}
+                  >
+                    {art === 'schraeg' ? 'Entlang Dachschräge' : 'Waagerecht'}
+                  </button>
+                ))}
+              </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <EingabeFeld
                   label="Plattenbreite"
@@ -448,12 +505,24 @@ const p = useMemo(() => ({
                 platteHoeheNorm={parseFloat(ep.platteHoehe) || 62.5}
                 ueberstand={parseFloat(ep.ueberstand) || 0}
                 mindestversatz={parseFloat(ep.mindestversatz) || 0}
+                verlegeart={ep.verlegeart}
               />
               {plattenErg && plattenErg.length > 0 && (
                 <div className="rounded-md border border-border bg-s2 px-4 py-3 space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-mu">
                     Schnittmaße — Abschnitt je Reihe
                   </p>
+                  {ep.verlegeart === 'waagerecht' && (() => {
+                    const ph = parseFloat(ep.platteHoehe) || 62.5;
+                    const vm = round1(ph / Math.tan(toRad(p.alpha)));
+                    return (
+                      <p className="text-[11px] text-mu">
+                        Verstichmass Hauptdach-Schmiege:{' '}
+                        <strong className="text-tx">{fmt(vm)} cm</strong>
+                        {' '}(= {ph} cm / tan {fmt(p.alpha)}°)
+                      </p>
+                    );
+                  })()}
                   <div className="space-y-1">
                     {plattenErg.map(({ r, la, laRaw, abschnitt }) => {
                       const versatzAngepasst = r > 0 && Math.abs(la - laRaw) > 0.05;
@@ -497,7 +566,7 @@ const p = useMemo(() => ({
 // Koordinatensystem: x = waagerecht (VK → First), y = lotrecht (↑)
 
 function GaubenwangeKonturSVG({
-  hvorne, alphaDeg, gammaDeg, platteBreite, platteHoeheFirst, platteHoeheNorm, ueberstand, mindestversatz,
+  hvorne, alphaDeg, gammaDeg, platteBreite, platteHoeheFirst, platteHoeheNorm, ueberstand, mindestversatz, verlegeart,
 }: {
   hvorne: number;
   alphaDeg: number;
@@ -507,6 +576,7 @@ function GaubenwangeKonturSVG({
   platteHoeheNorm: number;
   ueberstand: number;
   mindestversatz: number;
+  verlegeart: 'schraeg' | 'waagerecht';
 }) {
   const cosA  = Math.cos(toRad(alphaDeg));
   const sinA  = Math.sin(toRad(alphaDeg));
@@ -563,8 +633,45 @@ function GaubenwangeKonturSVG({
     firstLen         = abschnitt - 5;
   }
 
+  // ── Waagerecht-Reihen ─────────────────────────────────────────────────────────
+  type PlateW = { start: number; len: number };
+  type RowW   = { r: number; coY: number; ph: number; sEnd: number; plates: PlateW[]; abschnitt: number };
+  const allRowsW: RowW[] = [];
+  if (verlegeart === 'waagerecht') {
+    let coY             = 0;
+    let firstLenW: number | null = null;
+    let prevJointOffW   = 0;
+    for (let r = 0; r < 60; r++) {
+      const ph    = r === 0 ? platteHoeheFirst : platteHoeheNorm;
+      const sEnd  = (coY + ph) / tanA;
+      if (sEnd <= 0.1) break;
+      const laRaw: number = firstLenW ?? pb;
+      if (firstLenW !== null && laRaw <= 0) break;
+      const la: number = r === 0
+        ? laRaw
+        : applyMindestversatz(laRaw, prevJointOffW, pb, mindestversatz);
+      const platesW: PlateW[] = [];
+      if (r === 0) {
+        let s = -ueberstand;
+        while (s < sEnd) { platesW.push({ start: s, len: pb }); s += pb; }
+      } else {
+        platesW.push({ start: -ueberstand, len: la });
+        let s = -ueberstand + la;
+        while (s < sEnd) { platesW.push({ start: s, len: pb }); s += pb; }
+      }
+      const lastW      = platesW[platesW.length - 1];
+      const abschnittW = lastW.start + lastW.len - sEnd;
+      allRowsW.push({ r, coY, ph, sEnd, plates: platesW, abschnitt: abschnittW });
+      coY             += ph;
+      prevJointOffW    = r === 0 ? 0 : la;
+      firstLenW        = abschnittW - 5;
+      if (coY >= hvorne) break;
+    }
+  }
+
   // ── SVG-Layout ────────────────────────────────────────────────────────────────
-  const nPlatten0 = allRows[0]?.plates.length ?? 1;
+  const activeRows = verlegeart === 'waagerecht' ? allRowsW : allRows;
+  const nPlatten0  = activeRows[0]?.plates.length ?? 1;
 
   const BASE_PAD_L = 52; const PAD_R_BASE = 28; const PAD_T = 28; const PAD_B = 50;
   const MAX_W = 540; const MAX_H = 380;
@@ -574,7 +681,9 @@ function GaubenwangeKonturSVG({
     (MAX_H - PAD_T - PAD_B) / yF,
   ) * 0.86;
 
-  const plateLeftPx  = Math.ceil((ueberstand + platteHoeheFirst * sinA) * scale) + 10;
+  const plateLeftPx  = verlegeart === 'schraeg'
+    ? Math.ceil((ueberstand + platteHoeheFirst * sinA) * scale) + 10
+    : Math.ceil(ueberstand * scale) + 10;
   const plateRightPx = Math.ceil(Math.max(0, nPlatten0 * pb * cosA - T) * scale) + 16;
   const PAD_L = BASE_PAD_L + plateLeftPx;
   const PAD_R = PAD_R_BASE + plateRightPx;
@@ -600,6 +709,13 @@ function GaubenwangeKonturSVG({
       [sx(start * cosA - phRow * sinA),             sy(y0 + start * sinA + phRow * cosA)]             as [number, number],
     ];
   };
+
+  const eckenW = (startX: number, lenX: number, coY: number, phRow: number): [number, number][] => [
+    [sx(startX),          sy(coY)],
+    [sx(startX + lenX),   sy(coY)],
+    [sx(startX + lenX),   sy(coY + phRow)],
+    [sx(startX),          sy(coY + phRow)],
+  ];
 
   const polyStr = (pts: [number, number][]) => pts.map(([x, y]) => `${x},${y}`).join(' ');
 
@@ -627,11 +743,25 @@ function GaubenwangeKonturSVG({
         </clipPath>
       </defs>
 
-      {/* Geisterplatten aller Reihen */}
-      {allRows.flatMap(({ r, co, ph, plates }) =>
+      {/* ── Schräg-Modus ── */}
+      {verlegeart === 'schraeg' && <>
+        {/* Geisterplatten */}
+        {allRows.flatMap(({ r, co, ph, plates }) =>
+          plates.map(({ start, len }, i) => (
+            <polygon key={`g${r}-${i}`}
+              points={polyStr(ecken(start, len, co, ph))}
+              fill={fillCol(r)} fillOpacity="0.05"
+              stroke={fillCol(r)} strokeWidth="0.8" strokeDasharray="5 3" opacity="0.45"
+            />
+          ))
+        )}
+      </>}
+
+      {/* ── Waagerecht-Modus: Geisterplatten ── */}
+      {verlegeart === 'waagerecht' && allRowsW.flatMap(({ r, coY, ph, plates }) =>
         plates.map(({ start, len }, i) => (
-          <polygon key={`g${r}-${i}`}
-            points={polyStr(ecken(start, len, co, ph))}
+          <polygon key={`gw${r}-${i}`}
+            points={polyStr(eckenW(start, len, coY, ph))}
             fill={fillCol(r)} fillOpacity="0.05"
             stroke={fillCol(r)} strokeWidth="0.8" strokeDasharray="5 3" opacity="0.45"
           />
@@ -644,34 +774,47 @@ function GaubenwangeKonturSVG({
         fill="url(#gk-hatch)" stroke="#504840" strokeWidth="2" strokeLinejoin="round"
       />
 
-      {/* Alle Platten geclippt */}
-      <g clipPath="url(#gk-clip)">
-        {allRows.flatMap(({ r, co, ph, plates }) =>
-          plates.map(({ start, len }, i) => (
-            <polygon key={`c${r}-${i}`}
-              points={polyStr(ecken(start, len, co, ph))}
-              fill={fillCol(r)} fillOpacity={fillOpac(r, i)}
-              stroke={fillCol(r)} strokeWidth="1.3" strokeLinejoin="round"
-            />
-          ))
-        )}
-      </g>
+      {/* ── Schräg-Modus: geclippt ── */}
+      {verlegeart === 'schraeg' && (
+        <g clipPath="url(#gk-clip)">
+          {allRows.flatMap(({ r, co, ph, plates }) =>
+            plates.map(({ start, len }, i) => (
+              <polygon key={`c${r}-${i}`}
+                points={polyStr(ecken(start, len, co, ph))}
+                fill={fillCol(r)} fillOpacity={fillOpac(r, i)}
+                stroke={fillCol(r)} strokeWidth="1.3" strokeLinejoin="round"
+              />
+            ))
+          )}
+        </g>
+      )}
 
-      {/* Überstand-Markierung: lotrechte Außenkante + verlängerte Gaubendachlinie */}
+      {/* ── Waagerecht-Modus: geclippt ── */}
+      {verlegeart === 'waagerecht' && (
+        <g clipPath="url(#gk-clip)">
+          {allRowsW.flatMap(({ r, coY, ph, plates }) =>
+            plates.map(({ start, len }, i) => (
+              <polygon key={`cw${r}-${i}`}
+                points={polyStr(eckenW(start, len, coY, ph))}
+                fill={fillCol(r)} fillOpacity={fillOpac(r, i)}
+                stroke={fillCol(r)} strokeWidth="1.3" strokeLinejoin="round"
+              />
+            ))
+          )}
+        </g>
+      )}
+
+      {/* Überstand-Markierung */}
       {ueberstand > 0 && (() => {
         const xOut = -ueberstand;
-        const yBot = xOut * tanA;           // Hauptdachlinie bei x = -ueberstand
-        const yTop = hvorne + xOut * tanG;  // Gaubendachlinie bei x = -ueberstand
+        const yBot = xOut * tanA;
+        const yTop = hvorne + xOut * tanG;
         return (
           <>
-            <line
-              x1={sx(xOut)} y1={sy(yBot)} x2={sx(xOut)} y2={sy(yTop)}
-              stroke="#6fa8d4" strokeWidth="0.8" strokeLinecap="round"
-            />
-            <line
-              x1={sx(xOut)} y1={sy(yTop)} x2={wC.x} y2={wC.y}
-              stroke="#6fa8d4" strokeWidth="0.8" strokeLinecap="round"
-            />
+            <line x1={sx(xOut)} y1={sy(yBot)} x2={sx(xOut)} y2={sy(yTop)}
+              stroke="#6fa8d4" strokeWidth="0.8" strokeLinecap="round" />
+            <line x1={sx(xOut)} y1={sy(yTop)} x2={wC.x} y2={wC.y}
+              stroke="#6fa8d4" strokeWidth="0.8" strokeLinecap="round" />
           </>
         );
       })()}
@@ -681,51 +824,83 @@ function GaubenwangeKonturSVG({
       <text x={wB.x + 5} y={wB.y + 4}  fontSize="9" fill="#504840" fontWeight="700">B</text>
       <text x={wC.x - 7} y={wC.y + 4}  fontSize="9" fill="#504840" textAnchor="end" fontWeight="700">C</text>
 
-      {/* Eckpunkte der 1. Platte Reihe 0 */}
-      {p0 && <>
-        <text x={p0[0][0] + 3}  y={p0[0][1] + 13} fontSize="8" fill="#6fa8d4" fontWeight="700">a</text>
-        <text x={p0[1][0] + 5}  y={p0[1][1] + 4}  fontSize="8" fill="#6fa8d4" fontWeight="700">b</text>
-        <text x={p0[3][0] - 4}  y={p0[3][1] + 3}  fontSize="8" fill="#6fa8d4" textAnchor="end" opacity="0.45" fontWeight="700">c</text>
-        <text x={p0[2][0] + 5}  y={p0[2][1] + 4}  fontSize="8" fill="#6fa8d4" fontWeight="700">d</text>
+      {/* ── Schräg-Modus: Eckpunkte 1. Platte + Labels + Abschnitt ── */}
+      {verlegeart === 'schraeg' && <>
+        {p0 && <>
+          <text x={p0[0][0] + 3}  y={p0[0][1] + 13} fontSize="8" fill="#6fa8d4" fontWeight="700">a</text>
+          <text x={p0[1][0] + 5}  y={p0[1][1] + 4}  fontSize="8" fill="#6fa8d4" fontWeight="700">b</text>
+          <text x={p0[3][0] - 4}  y={p0[3][1] + 3}  fontSize="8" fill="#6fa8d4" textAnchor="end" opacity="0.45" fontWeight="700">c</text>
+          <text x={p0[2][0] + 5}  y={p0[2][1] + 4}  fontSize="8" fill="#6fa8d4" fontWeight="700">d</text>
+        </>}
+        {allRows.flatMap(({ r, co, ph, plates, sEnd }) =>
+          plates.map(({ start, len }, i) => {
+            if (r === 0 && i === 0) return null;
+            const clampedEnd = Math.min(start + len, sEnd);
+            const midS = (start + clampedEnd) / 2;
+            const lx   = sx(midS * cosA - (ph / 2) * sinA);
+            const ly   = sy(co / cosA + midS * sinA + (ph / 2) * cosA);
+            const label = r > 0 && i === 0 ? `${fmt(round1(len))} cm` : String(i + 1);
+            return (
+              <text key={`l${r}-${i}`} x={lx} y={ly}
+                fontSize="8" fill={fillCol(r)} textAnchor="middle" dominantBaseline="middle"
+                fontWeight="700" opacity="0.85">
+                {label}
+              </text>
+            );
+          })
+        )}
+        {row0 && (() => {
+          const last    = row0.plates[row0.plates.length - 1];
+          const endX    = (last.start + last.len) * cosA;
+          const endY    = (last.start + last.len) * sinA;
+          const midSvgX = (wB.x + sx(endX)) / 2;
+          const midSvgY = (wB.y + sy(endY)) / 2;
+          return (
+            <g>
+              <line x1={wB.x} y1={wB.y} x2={sx(endX)} y2={sy(endY)}
+                stroke="#7fb87a" strokeWidth="2.5" strokeLinecap="round" opacity="0.85" />
+              <text x={midSvgX + sinA * 16} y={midSvgY + cosA * 16}
+                fontSize="8" fill="#7fb87a" textAnchor="middle" fontWeight="700">
+                {fmt(round1(row0.abschnitt))} cm
+              </text>
+            </g>
+          );
+        })()}
       </>}
 
-      {/* Platten-Labels: Nummer (Vollplatten) oder Maß (1. Platte Folgereihen) */}
-      {allRows.flatMap(({ r, co, ph, plates, sEnd }) =>
-        plates.map(({ start, len }, i) => {
-          if (r === 0 && i === 0) return null; // Reihe-0-Platte-0: Eckpunkt-Labels genügen
-          const clampedEnd = Math.min(start + len, sEnd);
-          const midS = (start + clampedEnd) / 2;
-          const lx   = sx(midS * cosA - (ph / 2) * sinA);
-          const ly   = sy(co / cosA + midS * sinA + (ph / 2) * cosA);
-          const label = r > 0 && i === 0 ? `${fmt(round1(len))} cm` : String(i + 1);
+      {/* ── Waagerecht-Modus: Labels + Verstichmass-Linien ── */}
+      {verlegeart === 'waagerecht' && <>
+        {allRowsW.flatMap(({ r, coY, ph, plates, sEnd }) =>
+          plates.map(({ start, len }, i) => {
+            if (r === 0 && i === 0) return null;
+            const clampedEnd = Math.min(start + len, sEnd);
+            const midX  = (start + clampedEnd) / 2;
+            const label = r > 0 && i === 0 ? `${fmt(round1(len))} cm` : String(i + 1);
+            return (
+              <text key={`lw${r}-${i}`} x={sx(midX)} y={sy(coY + ph / 2)}
+                fontSize="8" fill={fillCol(r)} textAnchor="middle" dominantBaseline="middle"
+                fontWeight="700" opacity="0.85">
+                {label}
+              </text>
+            );
+          })
+        )}
+        {allRowsW.map(({ r, coY, ph, sEnd }) => {
+          const xBot = coY / tanA;
+          const xTop = sEnd;
+          if (sx(xTop) > SVG_W + 20) return null;
           return (
-            <text key={`l${r}-${i}`} x={lx} y={ly}
-              fontSize="8" fill={fillCol(r)} textAnchor="middle" dominantBaseline="middle"
-              fontWeight="700" opacity="0.85">
-              {label}
-            </text>
+            <g key={`vm${r}`}>
+              <line x1={sx(xBot)} y1={sy(coY)} x2={sx(xTop)} y2={sy(coY + ph)}
+                stroke="#d47070" strokeWidth="1.2" strokeDasharray="4 2" />
+              <text x={sx((xBot + xTop) / 2) + 8} y={sy(coY + ph / 2)}
+                fontSize="7.5" fill="#d47070" dominantBaseline="middle">
+                v={fmt(round1(ph / tanA))} cm
+              </text>
+            </g>
           );
-        })
-      )}
-
-      {/* Abschnitt-Marker Reihe 0: Überstand über den First */}
-      {row0 && (() => {
-        const last  = row0.plates[row0.plates.length - 1];
-        const endX  = (last.start + last.len) * cosA;
-        const endY  = (last.start + last.len) * sinA;
-        const midSvgX = (wB.x + sx(endX)) / 2;
-        const midSvgY = (wB.y + sy(endY)) / 2;
-        return (
-          <g>
-            <line x1={wB.x} y1={wB.y} x2={sx(endX)} y2={sy(endY)}
-              stroke="#7fb87a" strokeWidth="2.5" strokeLinecap="round" opacity="0.85" />
-            <text x={midSvgX + sinA * 16} y={midSvgY + cosA * 16}
-              fontSize="8" fill="#7fb87a" textAnchor="middle" fontWeight="700">
-              {fmt(round1(row0.abschnitt))} cm
-            </text>
-          </g>
-        );
-      })()}
+        })}
+      </>}
 
       {/* Winkel */}
       <text x={wA.x + 6} y={wA.y - 5}  fontSize="9" fill="#c9924a" fontWeight="600">α = {alphaDeg}°</text>
