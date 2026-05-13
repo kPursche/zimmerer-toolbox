@@ -16,6 +16,26 @@ const toRad = (deg: number) => (deg * Math.PI) / 180;
 const fmt   = (v: number, dec = 1) => v.toFixed(dec);
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
+// Verschiebt den ersten Plattenstoss einer Reihe, damit der Mindestversatz
+// zur Fugenreihe darunter eingehalten wird. Probiert zuerst rückwärts (kürzen),
+// dann vorwärts (verlängern). prevOffset = Position des ersten Stosses der Vorreihe.
+function applyMindestversatz(la: number, prevOffset: number, pb: number, mv: number): number {
+  if (mv <= 0 || la <= 0) return la;
+  const d = ((la - prevOffset) % pb + pb) % pb;   // Abstand zur nächstliegenden Vorreihen-Fuge
+  if (d >= mv && pb - d >= mv) return la;          // bereits im gültigen Bereich
+
+  if (d < mv) {
+    // Fuge liegt d cm nach einer Vorreihen-Fuge — zu nah
+    const adjBack = la - d - mv;                   // rückwärts: Fuge mv cm vor die Vorreihen-Fuge
+    if (adjBack > 0) return adjBack;
+    return la + (mv - d);                          // vorwärts: Fuge mv cm nach der Vorreihen-Fuge
+  }
+  // pb - d < mv: Fuge liegt (pb-d) cm vor der nächsten Vorreihen-Fuge — zu nah
+  const adjFwd = la + (pb - d) - mv;              // vorwärts: mv cm vor die nächste Vorreihen-Fuge
+  if (adjFwd > 0) return adjFwd;
+  return la + (pb - d) + mv;                      // vorwärts: mv cm nach der nächsten Vorreihen-Fuge
+}
+
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
 interface Eingaben {
@@ -45,25 +65,13 @@ interface Ergebnis {
 }
 
 interface PlattenEingaben {
-  platteBreite: string;
-  platteHoehe: string;
-  verlegeweise: 'hauptdach' | 'waagerecht';
-  ersteReiheHoehe: string;
-  ueberstand: string;
+  platteBreite:    string; // cm, default 250
+  platteHoehe:     string; // cm, default 62.5
+  ersteReiheHoehe: string; // cm, leer = wie platteHoehe
+  ueberstand:      string; // cm, horizontal, default 0
+  mindestversatz:  string; // cm, Mindestabstand der Stossfugen zu Reihe darunter
 }
 
-interface PlattenReihe {
-  nr: number;
-  hoehe: number;
-  breiteUnten: number;
-  breiteOben: number;
-  anzahl: number;
-}
-
-interface PlattenErgebnis {
-  reihen: PlattenReihe[];
-  gesamtPlatten: number;
-}
 
 // ─── Berechnung ───────────────────────────────────────────────────────────────
 //
@@ -132,22 +140,6 @@ function berechne(
   return { T, yFirst, L_eckstaender, L_gaubendach, L_hauptdach, schnittVorneGaube, schnittFirst, lothölzer };
 }
 
-function berechnePlattenzuschnitt(
-  L: number, T: number,
-  pb: number, ph: number,
-  h1: number, ue: number,
-): PlattenErgebnis {
-  const reihen: PlattenReihe[] = [];
-  let h = 0; let nr = 1;
-  while (h < L - 0.01 && reihen.length < 60) {
-    const rowH = Math.min(nr === 1 ? h1 : ph, L - h);
-    const bu = T * (L - h) / L + ue;
-    const bo = Math.max(0, T * (L - h - rowH) / L + ue);
-    reihen.push({ nr: nr++, hoehe: rowH, breiteUnten: round1(bu), breiteOben: round1(bo), anzahl: Math.ceil(bu / pb) });
-    h += rowH;
-  }
-  return { reihen, gesamtPlatten: reihen.reduce((s, r) => s + r.anzahl, 0) };
-}
 
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
 
@@ -167,21 +159,7 @@ export function GauenwangenTool() {
     []
   );
 
-  const [ep, setEp] = useState<PlattenEingaben>({
-    platteBreite: '250',
-    platteHoehe: '125',
-    verlegeweise: 'hauptdach',
-    ersteReiheHoehe: '',
-    ueberstand: '0',
-  });
-  const setzeP = useCallback(
-    (key: keyof Omit<PlattenEingaben, 'verlegeweise'>) =>
-      (ev: React.ChangeEvent<HTMLInputElement>) =>
-        setEp((prev) => ({ ...prev, [key]: ev.target.value })),
-    []
-  );
-
-  const p = useMemo(() => ({
+const p = useMemo(() => ({
     hvorne:      parseFloat(e.eckhoeheVorne),
     alpha:       parseFloat(e.hauptdachNeigung),
     gamma:       parseFloat(e.gaubendachNeigung),
@@ -206,19 +184,54 @@ export function GauenwangenTool() {
     return berechne(p.hvorne, p.alpha, p.gamma, p.b, p.t, p.achsabstand);
   }, [fehler, p]);
 
+  const [ep, setEp] = useState<PlattenEingaben>({ platteBreite: '250', platteHoehe: '62.5', ersteReiheHoehe: '', ueberstand: '0', mindestversatz: '0' });
+  const setzeP = useCallback(
+    (key: keyof PlattenEingaben) => (ev: React.ChangeEvent<HTMLInputElement>) =>
+      setEp(prev => ({ ...prev, [key]: ev.target.value })),
+    [],
+  );
+
   const plattenErg = useMemo(() => {
-    if (!erg) return null;
-    const pb = parseFloat(ep.platteBreite);
-    const ph = parseFloat(ep.platteHoehe);
-    const ue = parseFloat(ep.ueberstand) || 0;
-    const h1 = parseFloat(ep.ersteReiheHoehe) || ph;
-    if (isNaN(pb) || pb <= 0 || isNaN(ph) || ph <= 0) return null;
-    if (ep.verlegeweise === 'hauptdach') {
-      const cosA = Math.cos(toRad(p.alpha));
-      return berechnePlattenzuschnitt(erg.L_eckstaender * cosA, erg.T / cosA, pb, ph, h1, ue);
+    if (fehler) return null;
+    const cosA  = Math.cos(toRad(p.alpha));
+    const tanG  = Math.tan(toRad(p.gamma));
+    const cosG  = Math.cos(toRad(p.gamma));
+    const sinAG = Math.sin(toRad(p.alpha - p.gamma));
+    const pb      = parseFloat(ep.platteBreite) || 250;
+    const ph0     = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
+    const phN     = parseFloat(ep.platteHoehe) || 62.5;
+    const uSlope  = (parseFloat(ep.ueberstand) || 0) / cosA;
+    const mv      = parseFloat(ep.mindestversatz) || 0;
+
+    type RowErg = { r: number; la: number; laRaw: number; abschnitt: number };
+    const rows: RowErg[] = [];
+    let co               = 0;
+    let firstLen: number | null = null;
+    let prevJointOffset  = 0; // Fugenversatz der Vorreihe (0 = Reihe-0-Muster)
+
+    for (let r = 0; r < 60; r++) {
+      const ph   = r === 0 ? ph0 : phN;
+      const sEnd = (p.hvorne - co / cosA) * cosG / sinAG;
+      if (sEnd <= 0.1) break;
+
+      const laRaw: number = firstLen ?? pb;
+      if (firstLen !== null && laRaw <= 0) break;
+
+      const la: number = r === 0
+        ? laRaw
+        : applyMindestversatz(laRaw, prevJointOffset, pb, mv);
+
+      let s: number           = -uSlope + la;
+      while (s < sEnd) s += pb;
+      const abschnitt: number = s - sEnd;
+
+      rows.push({ r, la, laRaw, abschnitt });
+      co              += ph;
+      prevJointOffset  = r === 0 ? 0 : la;
+      firstLen         = abschnitt - 5;
     }
-    return berechnePlattenzuschnitt(erg.L_eckstaender, erg.T, pb, ph, h1, ue);
-  }, [erg, ep, p.alpha]);
+    return rows;
+  }, [fehler, p, ep]);
 
   return (
     <div className="space-y-5">
@@ -386,103 +399,361 @@ export function GauenwangenTool() {
               <CardDescription>Beplankung der Gaubenwange</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <Gruppe label="Platte">
-                <div className="grid grid-cols-2 gap-3">
-                  <EingabeFeld label="Höhe" einheit="cm" wert={ep.platteHoehe} onChange={setzeP('platteHoehe')} min={1} step={1} />
-                  <EingabeFeld label="Breite" einheit="cm" wert={ep.platteBreite} onChange={setzeP('platteBreite')} min={1} step={1} />
-                </div>
-              </Gruppe>
-
-              <Gruppe label="Verlegeweise">
-                <div className="grid grid-cols-2 gap-2">
-                  {(['hauptdach', 'waagerecht'] as const).map((v) => (
-                    <button
-                      key={v}
-                      onClick={() => setEp((prev) => ({ ...prev, verlegeweise: v }))}
-                      className={`rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
-                        ep.verlegeweise === v
-                          ? 'border-oak bg-oak-alpha text-oak'
-                          : 'border-border bg-s2 text-mu hover:text-tx'
-                      }`}
-                    >
-                      {v === 'hauptdach' ? 'Hauptdachneigung' : 'Waagerecht'}
-                    </button>
-                  ))}
-                </div>
-              </Gruppe>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <EingabeFeld
-                  label="Erste Reihe Höhe"
+                  label="Plattenbreite"
+                  einheit="cm"
+                  wert={ep.platteBreite}
+                  onChange={setzeP('platteBreite')}
+                  min={1} step={0.5}
+                />
+                <EingabeFeld
+                  label="Plattenhöhe"
+                  einheit="cm"
+                  wert={ep.platteHoehe}
+                  onChange={setzeP('platteHoehe')}
+                  min={1} step={0.5}
+                />
+                <EingabeFeld
+                  label="1. Reihe Höhe"
                   einheit="cm"
                   wert={ep.ersteReiheHoehe}
                   onChange={setzeP('ersteReiheHoehe')}
-                  hinweis={`Standard: ${ep.platteHoehe || '—'} cm`}
-                  min={1} step={1}
+                  hinweis={`Standard: ${ep.platteHoehe || '62.5'} cm`}
+                  min={1} step={0.5}
                 />
                 <EingabeFeld
-                  label="Überstand"
+                  label="Überstand VK"
                   einheit="cm"
                   wert={ep.ueberstand}
                   onChange={setzeP('ueberstand')}
-                  hinweis="Über Gaubeneckständer"
-                  min={0} step={1}
+                  hinweis="horizontal am Gaubenständer"
+                  min={0} step={0.5}
+                />
+                <EingabeFeld
+                  label="Mindestversatz"
+                  einheit="cm"
+                  wert={ep.mindestversatz}
+                  onChange={setzeP('mindestversatz')}
+                  hinweis="Stossfugen-Versatz min."
+                  min={0} step={0.5}
                 />
               </div>
-
-              {plattenErg && plattenErg.reihen.length > 0 && (
-                <div className="space-y-3 border-t border-border pt-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-tx">
-                      {plattenErg.reihen.length} Reihen · {plattenErg.gesamtPlatten} Platten gesamt
-                    </p>
-                    <span className="text-[11px] text-mu">
-                      {ep.verlegeweise === 'hauptdach'
-                        ? `Eckst.-Schmiege: ${fmt(round1(p.alpha))}° · Firstschnitt: ${fmt(round1(erg.schnittFirst))}°`
-                        : 'Schnitt senkrecht (waagerecht)'}
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[380px] text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-left">
-                          <th className="pb-2 font-semibold text-tx">Reihe</th>
-                          <th className="pb-2 text-right font-semibold text-tx">Höhe<br /><span className="font-normal text-mu">cm</span></th>
-                          <th className="pb-2 text-right font-semibold text-tx">Breite unten<br /><span className="font-normal text-mu">cm</span></th>
-                          <th className="pb-2 text-right font-semibold text-tx">Breite oben<br /><span className="font-normal text-mu">cm</span></th>
-                          <th className="pb-2 text-right font-semibold text-tx">Platten<br /><span className="font-normal text-mu">Stk.</span></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {plattenErg.reihen.map((r) => (
-                          <tr key={r.nr}>
-                            <td className="py-2.5 text-mu">{r.nr}</td>
-                            <td className="py-2.5 text-right tabular-nums font-bold text-oak">{fmt(r.hoehe)}</td>
-                            <td className="py-2.5 text-right tabular-nums text-tx">{fmt(r.breiteUnten)}</td>
-                            <td className="py-2.5 text-right tabular-nums text-mu">{fmt(r.breiteOben)}</td>
-                            <td className="py-2.5 text-right tabular-nums font-bold text-pine">{r.anzahl}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-[10px] text-dm">
-                    Breite unten = benötigte Plattenbreite am unteren Rand · Breite oben = verbleibende Breite nach Diagonalschnitt rechts
+              <GaubenwangeKonturSVG
+                hvorne={p.hvorne}
+                alphaDeg={p.alpha}
+                gammaDeg={p.gamma}
+                platteBreite={parseFloat(ep.platteBreite) || 250}
+                platteHoeheFirst={parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5}
+                platteHoeheNorm={parseFloat(ep.platteHoehe) || 62.5}
+                ueberstand={parseFloat(ep.ueberstand) || 0}
+                mindestversatz={parseFloat(ep.mindestversatz) || 0}
+              />
+              {plattenErg && plattenErg.length > 0 && (
+                <div className="rounded-md border border-border bg-s2 px-4 py-3 space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-mu">
+                    Schnittmaße — Abschnitt je Reihe
                   </p>
-                  <PlattenzuschnittSVG
-                    reihen={plattenErg.reihen}
-                    L={ep.verlegeweise === 'hauptdach' ? erg.L_eckstaender * Math.cos(toRad(p.alpha)) : erg.L_eckstaender}
-                    T={ep.verlegeweise === 'hauptdach' ? erg.T / Math.cos(toRad(p.alpha)) : erg.T}
-                    platteBreite={parseFloat(ep.platteBreite) || 125}
-                    ueberstand={parseFloat(ep.ueberstand) || 0}
-                  />
+                  <div className="space-y-1">
+                    {plattenErg.map(({ r, la, laRaw, abschnitt }) => {
+                      const versatzAngepasst = r > 0 && Math.abs(la - laRaw) > 0.05;
+                      return (
+                        <div key={r} className="flex flex-wrap gap-x-6 gap-y-0.5 text-sm">
+                          <span className="w-16 shrink-0 text-mu">Reihe {r + 1}</span>
+                          {r > 0 && (
+                            <span className="text-tx">
+                              Platte 1:{" "}
+                              <strong className="tabular-nums text-pine">{fmt(round1(la))} cm</strong>
+                              {versatzAngepasst && (
+                                <span className="ml-1 text-xs text-mu">
+                                  (gekürzt von {fmt(round1(laRaw))} cm)
+                                </span>
+                              )}
+                            </span>
+                          )}
+                          <span className="text-tx">
+                            Abschnitt:{" "}
+                            <strong className="tabular-nums text-oak">{fmt(round1(abschnitt))} cm</strong>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
+
         </>
       )}
     </div>
+  );
+}
+
+// ─── Gaubenwange Kontur SVG ───────────────────────────────────────────────────
+//
+// Seitenansicht der Außenkontur: Dreieck aus Vorderkante (links), Hauptdachlinie
+// (unten) und Gaubendachlinie (oben), die sich am First treffen.
+// Koordinatensystem: x = waagerecht (VK → First), y = lotrecht (↑)
+
+function GaubenwangeKonturSVG({
+  hvorne, alphaDeg, gammaDeg, platteBreite, platteHoeheFirst, platteHoeheNorm, ueberstand, mindestversatz,
+}: {
+  hvorne: number;
+  alphaDeg: number;
+  gammaDeg: number;
+  platteBreite: number;
+  platteHoeheFirst: number;
+  platteHoeheNorm: number;
+  ueberstand: number;
+  mindestversatz: number;
+}) {
+  const cosA  = Math.cos(toRad(alphaDeg));
+  const sinA  = Math.sin(toRad(alphaDeg));
+  const tanA  = Math.tan(toRad(alphaDeg));
+  const tanG  = Math.tan(toRad(gammaDeg));
+  const cosG   = Math.cos(toRad(gammaDeg));
+  const sinAG  = Math.sin(toRad(alphaDeg - gammaDeg));
+  const uSlope = ueberstand / cosA; // horizontaler Überstand → Schräg-Offset
+
+  const T  = hvorne / (tanA - tanG);
+  const yF = T * tanA;
+  const pb = platteBreite;
+
+  // ── Alle Reihen berechnen ────────────────────────────────────────────────────
+  // sEnd(co): Schräglänge, bis Kante a/b die Gaubendachlinie erreicht
+  // Herleitung: co/cosA + s·sinA = hvorne + s·cosA·tanG
+  //             → s = (hvorne − co/cosA) · cosG / sin(α−γ)
+  type Plate = { start: number; len: number };
+  type Row   = { r: number; co: number; ph: number; sEnd: number; plates: Plate[]; abschnitt: number };
+
+  const allRows: Row[] = [];
+  let co              = 0;
+  let firstLen: number | null = null;
+  let prevJointOffset = 0;
+
+  for (let r = 0; r < 60; r++) {
+    const ph   = r === 0 ? platteHoeheFirst : platteHoeheNorm;
+    const sEnd = (hvorne - co / cosA) * cosG / sinAG;
+    if (sEnd <= 0.1) break;
+
+    const laRaw: number = firstLen ?? pb;
+    if (firstLen !== null && laRaw <= 0) break;
+
+    const la: number = r === 0
+      ? laRaw
+      : applyMindestversatz(laRaw, prevJointOffset, pb, mindestversatz);
+
+    const plates: Plate[] = [];
+    if (r === 0) {
+      let s = -uSlope;
+      while (s < sEnd) { plates.push({ start: s, len: pb }); s += pb; }
+    } else {
+      plates.push({ start: -uSlope, len: la });
+      let s = -uSlope + la;
+      while (s < sEnd) { plates.push({ start: s, len: pb }); s += pb; }
+    }
+
+    const last      = plates[plates.length - 1];
+    const abschnitt = last.start + last.len - sEnd;
+
+    allRows.push({ r, co, ph, sEnd, plates, abschnitt });
+    co              += ph;
+    prevJointOffset  = r === 0 ? 0 : la;
+    firstLen         = abschnitt - 5;
+  }
+
+  // ── SVG-Layout ────────────────────────────────────────────────────────────────
+  const nPlatten0 = allRows[0]?.plates.length ?? 1;
+
+  const BASE_PAD_L = 52; const PAD_R_BASE = 28; const PAD_T = 28; const PAD_B = 50;
+  const MAX_W = 540; const MAX_H = 380;
+
+  const scale = Math.min(
+    (MAX_W - BASE_PAD_L - PAD_R_BASE) / T,
+    (MAX_H - PAD_T - PAD_B) / yF,
+  ) * 0.86;
+
+  const plateLeftPx  = Math.ceil((ueberstand + platteHoeheFirst * sinA) * scale) + 10;
+  const plateRightPx = Math.ceil(Math.max(0, nPlatten0 * pb * cosA - T) * scale) + 16;
+  const PAD_L = BASE_PAD_L + plateLeftPx;
+  const PAD_R = PAD_R_BASE + plateRightPx;
+
+  const SVG_W = Math.round(T * scale + PAD_L + PAD_R);
+  const SVG_H = Math.round(yF * scale + PAD_T + PAD_B);
+
+  const sx = (x: number) => PAD_L + x * scale;
+  const sy = (y: number) => PAD_T + (yF - y) * scale;
+
+  const wA = { x: sx(0), y: sy(0) };
+  const wB = { x: sx(T), y: sy(yF) };
+  const wC = { x: sx(0), y: sy(hvorne) };
+
+  // Plattenecken: a=unten-links, b=unten-rechts, d=oben-rechts, c=oben-links
+  // start = Schräg-Offset ab Gaubenständer, co = kumulierter Senkrechtabstand
+  const ecken = (start: number, len: number, cumOff: number, phRow: number): [number, number][] => {
+    const y0 = cumOff / cosA;
+    return [
+      [sx(start * cosA),                            sy(y0 + start * sinA)]                            as [number, number],
+      [sx((start + len) * cosA),                    sy(y0 + (start + len) * sinA)]                    as [number, number],
+      [sx((start + len) * cosA - phRow * sinA),     sy(y0 + (start + len) * sinA + phRow * cosA)]     as [number, number],
+      [sx(start * cosA - phRow * sinA),             sy(y0 + start * sinA + phRow * cosA)]             as [number, number],
+    ];
+  };
+
+  const polyStr = (pts: [number, number][]) => pts.map(([x, y]) => `${x},${y}`).join(' ');
+
+  const fillCol  = (r: number) => r === 0 ? '#6fa8d4' : '#7fb87a';
+  const fillOpac = (r: number, i: number) => i % 2 === 0 ? (r === 0 ? 0.24 : 0.28) : (r === 0 ? 0.12 : 0.15);
+
+  const row0 = allRows[0];
+  const p0   = row0 ? ecken(-uSlope, pb, 0, row0.ph) : null;
+
+  const dimL = PAD_L - plateLeftPx - 30;
+  const dimB = sy(0) + 22;
+
+  return (
+    <svg
+      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+      className="w-full overflow-visible"
+      aria-label="Gaubenwange Außenkontur mit Platteneinteilung"
+    >
+      <defs>
+        <pattern id="gk-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="8" stroke="#c9924a" strokeWidth="0.6" opacity="0.25" />
+        </pattern>
+        <clipPath id="gk-clip">
+          <polygon points={`${wA.x},${wA.y} ${wB.x},${wB.y} ${wC.x},${wC.y}`} />
+        </clipPath>
+      </defs>
+
+      {/* Geisterplatten aller Reihen */}
+      {allRows.flatMap(({ r, co, ph, plates }) =>
+        plates.map(({ start, len }, i) => (
+          <polygon key={`g${r}-${i}`}
+            points={polyStr(ecken(start, len, co, ph))}
+            fill={fillCol(r)} fillOpacity="0.05"
+            stroke={fillCol(r)} strokeWidth="0.8" strokeDasharray="5 3" opacity="0.45"
+          />
+        ))
+      )}
+
+      {/* Wand-Außenkontur */}
+      <polygon
+        points={`${wA.x},${wA.y} ${wB.x},${wB.y} ${wC.x},${wC.y}`}
+        fill="url(#gk-hatch)" stroke="#504840" strokeWidth="2" strokeLinejoin="round"
+      />
+
+      {/* Alle Platten geclippt */}
+      <g clipPath="url(#gk-clip)">
+        {allRows.flatMap(({ r, co, ph, plates }) =>
+          plates.map(({ start, len }, i) => (
+            <polygon key={`c${r}-${i}`}
+              points={polyStr(ecken(start, len, co, ph))}
+              fill={fillCol(r)} fillOpacity={fillOpac(r, i)}
+              stroke={fillCol(r)} strokeWidth="1.3" strokeLinejoin="round"
+            />
+          ))
+        )}
+      </g>
+
+      {/* Überstand-Markierung: lotrechte Außenkante + verlängerte Gaubendachlinie */}
+      {ueberstand > 0 && (() => {
+        const xOut = -ueberstand;
+        const yBot = xOut * tanA;           // Hauptdachlinie bei x = -ueberstand
+        const yTop = hvorne + xOut * tanG;  // Gaubendachlinie bei x = -ueberstand
+        return (
+          <>
+            <line
+              x1={sx(xOut)} y1={sy(yBot)} x2={sx(xOut)} y2={sy(yTop)}
+              stroke="#6fa8d4" strokeWidth="0.8" strokeLinecap="round"
+            />
+            <line
+              x1={sx(xOut)} y1={sy(yTop)} x2={wC.x} y2={wC.y}
+              stroke="#6fa8d4" strokeWidth="0.8" strokeLinecap="round"
+            />
+          </>
+        );
+      })()}
+
+      {/* Wand-Eckpunkte */}
+      <text x={wA.x - 7} y={wA.y + 4}  fontSize="9" fill="#504840" textAnchor="end" fontWeight="700">A</text>
+      <text x={wB.x + 5} y={wB.y + 4}  fontSize="9" fill="#504840" fontWeight="700">B</text>
+      <text x={wC.x - 7} y={wC.y + 4}  fontSize="9" fill="#504840" textAnchor="end" fontWeight="700">C</text>
+
+      {/* Eckpunkte der 1. Platte Reihe 0 */}
+      {p0 && <>
+        <text x={p0[0][0] + 3}  y={p0[0][1] + 13} fontSize="8" fill="#6fa8d4" fontWeight="700">a</text>
+        <text x={p0[1][0] + 5}  y={p0[1][1] + 4}  fontSize="8" fill="#6fa8d4" fontWeight="700">b</text>
+        <text x={p0[3][0] - 4}  y={p0[3][1] + 3}  fontSize="8" fill="#6fa8d4" textAnchor="end" opacity="0.45" fontWeight="700">c</text>
+        <text x={p0[2][0] + 5}  y={p0[2][1] + 4}  fontSize="8" fill="#6fa8d4" fontWeight="700">d</text>
+      </>}
+
+      {/* Platten-Labels: Nummer (Vollplatten) oder Maß (1. Platte Folgereihen) */}
+      {allRows.flatMap(({ r, co, ph, plates, sEnd }) =>
+        plates.map(({ start, len }, i) => {
+          if (r === 0 && i === 0) return null; // Reihe-0-Platte-0: Eckpunkt-Labels genügen
+          const clampedEnd = Math.min(start + len, sEnd);
+          const midS = (start + clampedEnd) / 2;
+          const lx   = sx(midS * cosA - (ph / 2) * sinA);
+          const ly   = sy(co / cosA + midS * sinA + (ph / 2) * cosA);
+          const label = r > 0 && i === 0 ? `${fmt(round1(len))} cm` : String(i + 1);
+          return (
+            <text key={`l${r}-${i}`} x={lx} y={ly}
+              fontSize="8" fill={fillCol(r)} textAnchor="middle" dominantBaseline="middle"
+              fontWeight="700" opacity="0.85">
+              {label}
+            </text>
+          );
+        })
+      )}
+
+      {/* Abschnitt-Marker Reihe 0: Überstand über den First */}
+      {row0 && (() => {
+        const last  = row0.plates[row0.plates.length - 1];
+        const endX  = (last.start + last.len) * cosA;
+        const endY  = (last.start + last.len) * sinA;
+        const midSvgX = (wB.x + sx(endX)) / 2;
+        const midSvgY = (wB.y + sy(endY)) / 2;
+        return (
+          <g>
+            <line x1={wB.x} y1={wB.y} x2={sx(endX)} y2={sy(endY)}
+              stroke="#7fb87a" strokeWidth="2.5" strokeLinecap="round" opacity="0.85" />
+            <text x={midSvgX + sinA * 16} y={midSvgY + cosA * 16}
+              fontSize="8" fill="#7fb87a" textAnchor="middle" fontWeight="700">
+              {fmt(round1(row0.abschnitt))} cm
+            </text>
+          </g>
+        );
+      })()}
+
+      {/* Winkel */}
+      <text x={wA.x + 6} y={wA.y - 5}  fontSize="9" fill="#c9924a" fontWeight="600">α = {alphaDeg}°</text>
+      <text x={wC.x + 6} y={wC.y + 12} fontSize="9" fill="#c9924a" fontWeight="600">γ = {gammaDeg}°</text>
+
+      {/* Bemaßung: hvorne */}
+      <line x1={dimL} y1={wA.y} x2={dimL} y2={wC.y} stroke="#7fb87a" strokeWidth="1.3" />
+      <line x1={dimL - 4} y1={wA.y} x2={dimL + 4} y2={wA.y} stroke="#7fb87a" strokeWidth="1.3" />
+      <line x1={dimL - 4} y1={wC.y} x2={dimL + 4} y2={wC.y} stroke="#7fb87a" strokeWidth="1.3" />
+      <text x={dimL - 5} y={(wA.y + wC.y) / 2} fontSize="8.5" fill="#7fb87a" textAnchor="middle"
+        transform={`rotate(-90 ${dimL - 5} ${(wA.y + wC.y) / 2})`}>
+        {fmt(hvorne)} cm
+      </text>
+
+      {/* Bemaßung: T */}
+      <line x1={wA.x} y1={dimB} x2={wB.x} y2={dimB} stroke="#d47070" strokeWidth="1.3" />
+      <line x1={wA.x} y1={dimB - 4} x2={wA.x} y2={dimB + 4} stroke="#d47070" strokeWidth="1.3" />
+      <line x1={wB.x} y1={dimB - 4} x2={wB.x} y2={dimB + 4} stroke="#d47070" strokeWidth="1.3" />
+      <text x={(wA.x + wB.x) / 2} y={dimB + 13} fontSize="8.5" fill="#d47070" textAnchor="middle">
+        T = {fmt(round1(T))} cm
+      </text>
+
+      {/* Firsthöhe gestrichelt */}
+      <line x1={wB.x} y1={wB.y} x2={wB.x} y2={wA.y} stroke="#888" strokeWidth="0.8" strokeDasharray="4 3" />
+      <text x={wB.x + 4} y={(wB.y + wA.y) / 2} fontSize="8" fill="#888" dominantBaseline="middle">
+        {fmt(round1(yF))} cm
+      </text>
+    </svg>
   );
 }
 
@@ -522,203 +793,6 @@ function EingabeFeld({ label, einheit, wert, onChange, min, max, step, hinweis }
   );
 }
 
-// ─── Plattenzuschnitt-Zeichnung ───────────────────────────────────────────────
-
-function PlattenzuschnittSVG({
-  reihen, L, T, platteBreite, ueberstand,
-}: {
-  reihen: PlattenReihe[];
-  L: number; T: number;
-  platteBreite: number;
-  ueberstand: number;
-}) {
-  // precompute cumulative bottom heights
-  const hbArr: number[] = [];
-  let runH = 0;
-  for (const r of reihen) { hbArr.push(runH); runH += r.hoehe; }
-
-  // per-row joint positions (measured from left plate edge = 0, regardless of ueberstand)
-  type JRow = { joints: number[]; startPiece: number };
-  const jrows: JRow[] = [];
-  let offcut = 0;
-  for (const r of reihen) {
-    const bu = r.breiteUnten;
-    const sp = offcut;
-    const joints: number[] = [];
-    if (sp > 0.01 && sp < bu - 0.01) joints.push(sp);
-    let x = sp;
-    while (x + platteBreite < bu - 0.01) { x += platteBreite; joints.push(x); }
-    const rem = sp >= bu ? 0 : (bu - sp) % platteBreite;
-    offcut = rem < 0.01 ? (sp >= bu ? sp - bu : 0) : platteBreite - rem;
-    if (sp >= bu) offcut = sp - bu;
-    jrows.push({ joints, startPiece: sp });
-  }
-
-  // SVG layout
-  const PAD_L = 44; const PAD_R = 12; const PAD_T = 14; const PAD_B = 28;
-  const SVG_W = 500;
-  const drawW = SVG_W - PAD_L - PAD_R;
-  const totalW = T + ueberstand;
-  const sc = drawW / totalW;
-  const drawH = L * sc;
-  const SVG_H = PAD_T + drawH + PAD_B;
-
-  // coordinate helpers (wall-local: x=0 at Eckständer, y=0 at bottom)
-  const sx = (x: number) => PAD_L + (x + ueberstand) * sc;
-  const sy = (y: number) => PAD_T + (L - y) * sc;
-
-  const COL_A = '#9dc87d'; // even rows
-  const COL_B = '#7aad5c'; // odd rows
-  const COL_AB = '#e8c462'; // Abschnitt (starting piece)
-
-  return (
-    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full overflow-visible" aria-label="Plattenzuschnitt Gaubenwange">
-      <defs>
-        {reihen.map((r, i) => {
-          const hb = hbArr[i]; const ht = hb + r.hoehe;
-          return (
-            <clipPath key={r.nr} id={`pz-c-${r.nr}`}>
-              <polygon points={[
-                `${PAD_L},${sy(hb)}`,
-                `${PAD_L + r.breiteUnten * sc},${sy(hb)}`,
-                `${PAD_L + r.breiteOben * sc},${sy(ht)}`,
-                `${PAD_L},${sy(ht)}`,
-              ].join(' ')} />
-            </clipPath>
-          );
-        })}
-      </defs>
-
-      {/* Rows */}
-      {reihen.map((r, i) => {
-        const hb = hbArr[i]; const ht = hb + r.hoehe;
-        const { joints, startPiece } = jrows[i];
-        const trapPts = [
-          `${PAD_L},${sy(hb)}`,
-          `${PAD_L + r.breiteUnten * sc},${sy(hb)}`,
-          `${PAD_L + r.breiteOben * sc},${sy(ht)}`,
-          `${PAD_L},${sy(ht)}`,
-        ].join(' ');
-        const rowH_svg = sy(hb) - sy(ht); // pixel height of this row
-
-        return (
-          <g key={r.nr}>
-            {/* row fill */}
-            <polygon points={trapPts} fill={i % 2 === 0 ? COL_A : COL_B} fillOpacity="0.65" stroke="none" />
-
-            {/* Abschnitt (starting piece) highlight for rows ≥ 2 */}
-            {i > 0 && startPiece > 0.01 && (
-              <rect
-                x={PAD_L} y={sy(ht)}
-                width={Math.min(startPiece, r.breiteUnten) * sc}
-                height={rowH_svg}
-                fill={COL_AB} fillOpacity="0.8"
-                clipPath={`url(#pz-c-${r.nr})`}
-              />
-            )}
-
-            {/* joint lines */}
-            {joints.map((jx, ji) => (
-              <line key={ji}
-                x1={PAD_L + jx * sc} y1={sy(hb)}
-                x2={PAD_L + jx * sc} y2={sy(ht)}
-                stroke="rgba(0,0,0,0.4)" strokeWidth="1.2"
-                clipPath={`url(#pz-c-${r.nr})`}
-              />
-            ))}
-
-            {/* row border */}
-            <polygon points={trapPts} fill="none" stroke="rgba(0,0,0,0.22)" strokeWidth="0.75" />
-
-            {/* row number */}
-            {rowH_svg > 11 && (
-              <text x={PAD_L + 4} y={sy(ht) + rowH_svg / 2 + 3.5}
-                fontSize="8.5" fill="rgba(0,0,0,0.5)" fontWeight="700">{r.nr}</text>
-            )}
-          </g>
-        );
-      })}
-
-      {/* Eckständer (green line) */}
-      <line x1={sx(0)} y1={sy(0)} x2={sx(0)} y2={sy(L)}
-        stroke="#7fb87a" strokeWidth="2" />
-      <text x={sx(0) + 3} y={sy(L) + 10} fontSize="8" fill="#7fb87a">EK</text>
-
-      {/* Ueberstand bracket */}
-      {ueberstand > 0.01 && (
-        <g>
-          <line x1={PAD_L} y1={sy(0) + 14} x2={sx(0)} y2={sy(0) + 14}
-            stroke="#b89060" strokeWidth="0.9" />
-          <line x1={PAD_L} y1={sy(0) + 10} x2={PAD_L} y2={sy(0) + 18} stroke="#b89060" strokeWidth="0.9" />
-          <line x1={sx(0)} y1={sy(0) + 10} x2={sx(0)} y2={sy(0) + 18} stroke="#b89060" strokeWidth="0.9" />
-          <text x={(PAD_L + sx(0)) / 2} y={sy(0) + 25} fontSize="7.5" fill="#b89060" textAnchor="middle">
-            Ü {fmt(ueberstand)} cm
-          </text>
-        </g>
-      )}
-
-      {/* Wall outline */}
-      <polygon
-        points={`${sx(0)},${sy(0)} ${sx(T)},${sy(0)} ${sx(0)},${sy(L)}`}
-        fill="none" stroke="#504840" strokeWidth="1.5"
-      />
-
-      {/* Left axis: row height ticks */}
-      {reihen.map((r, i) => {
-        const hb = hbArr[i]; const ht = hb + r.hoehe;
-        const midY = (sy(hb) + sy(ht)) / 2;
-        return (
-          <g key={`yt-${r.nr}`}>
-            <line x1={PAD_L - 4} y1={sy(hb)} x2={PAD_L - 1} y2={sy(hb)} stroke="#888" strokeWidth="0.7" />
-            <text x={PAD_L - 6} y={midY + 3} fontSize="7.5" fill="#555" textAnchor="end">{fmt(r.hoehe)}</text>
-          </g>
-        );
-      })}
-      {/* top tick */}
-      <line x1={PAD_L - 4} y1={PAD_T} x2={PAD_L - 1} y2={PAD_T} stroke="#888" strokeWidth="0.7" />
-      {/* cm label */}
-      <text x={PAD_L - 6} y={PAD_T - 3} fontSize="6.5" fill="#888" textAnchor="end">cm</text>
-
-      {/* Bottom: platteBreite indicator (first joint in row 1) */}
-      {jrows.length > 0 && jrows[0].joints.length > 0 && (() => {
-        const j0 = jrows[0].joints[0]; // = platteBreite (first joint in row 1)
-        const x1s = PAD_L; const x2s = PAD_L + j0 * sc;
-        const yd = sy(0) + 13;
-        return (
-          <g>
-            <line x1={x1s} y1={yd} x2={x2s} y2={yd} stroke="#504840" strokeWidth="0.9" />
-            <line x1={x1s} y1={yd - 4} x2={x1s} y2={yd + 4} stroke="#504840" strokeWidth="0.9" />
-            <line x1={x2s} y1={yd - 4} x2={x2s} y2={yd + 4} stroke="#504840" strokeWidth="0.9" />
-            <text x={(x1s + x2s) / 2} y={yd + 12} fontSize="8" fill="#504840" textAnchor="middle">
-              {fmt(j0)} cm
-            </text>
-          </g>
-        );
-      })()}
-
-      {/* Legend */}
-      <g transform={`translate(${PAD_L}, ${SVG_H - 7})`}>
-        <rect x="0" y="-5" width="11" height="7" fill={COL_A} fillOpacity="0.65" />
-        <rect x="0" y="-5" width="11" height="7" fill="none" stroke="rgba(0,0,0,0.22)" strokeWidth="0.75" />
-        <text x="14" y="2" fontSize="7.5" fill="#504840">Platte</text>
-        <rect x="55" y="-5" width="11" height="7" fill={COL_AB} fillOpacity="0.8" />
-        <text x="69" y="2" fontSize="7.5" fill="#504840">Abschnitt</text>
-        <rect x="124" y="-5" width="2" height="7" fill="none" stroke="rgba(0,0,0,0.4)" strokeWidth="1.2" />
-        <text x="129" y="2" fontSize="7.5" fill="#504840">Stoß</text>
-      </g>
-    </svg>
-  );
-}
-
-function HkZeile({ name, laenge, schnitte }: { name: string; laenge: number; schnitte: string }) {
-  return (
-    <tr>
-      <td className="py-3 font-semibold text-tx">{name}</td>
-      <td className="py-3 text-right tabular-nums font-bold text-oak">{fmt(round1(laenge))} cm</td>
-      <td className="py-3 text-right text-xs text-mu">{schnitte}</td>
-    </tr>
-  );
-}
 
 // ─── Zuschnittansicht ─────────────────────────────────────────────────────────
 

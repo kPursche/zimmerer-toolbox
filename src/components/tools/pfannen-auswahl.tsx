@@ -20,8 +20,11 @@ export interface Modell {
   name: string;
   active: boolean;
   pdf_url: string | null;
-  la_min?: number;      // Mindest-Lattenabstand in mm
-  la_max?: number;      // Höchst-Lattenabstand in mm
+  la_min?: number;       // Mindest-Lattenabstand Doppeldeckung in mm
+  la_max?: number;       // Höchst-Lattenabstand Doppeldeckung in mm
+  krone_la_min?: number; // Mindest-Lattenabstand Kronendeckung in mm (nur Biberschwanz)
+  krone_la_max?: number; // Höchst-Lattenabstand Kronendeckung in mm (nur Biberschwanz)
+  krone_hb?: number;    // halbe Ziegelbreite = Versatzmaß für Kronendeckung (mm)
   put_min?: number;     // min Plattenüberstand in mm
   put_max?: number;     // max Plattenüberstand in mm
   put_default?: number; // Vorgabe-PÜT (wenn nicht = Mitte aus put_min/put_max)
@@ -176,7 +179,8 @@ const BRAAS_MODELLE: Modell[] = [
   },
   // Biberschwanz – Opal (Doppeldeckung: LAT1 variabel, LAT2 = 120 mm fest)
   { id: "opal", name: "Opal", active: true, pdf_url: "/pdfs/braas-opal.pdf",
-    la_min: 145, la_max: 165, put_min: 0, put_max: 40, lat_base: 215,
+    la_min: 145, la_max: 165, krone_la_min: 290, krone_la_max: 330, krone_hb: 90,
+    put_min: 0, put_max: 40, lat_base: 215,
     laf_table: [
       { bis_grad: 30, laf: 100 },
       { bis_grad: 45, laf: 90 },
@@ -184,7 +188,8 @@ const BRAAS_MODELLE: Modell[] = [
     ],
   },
   { id: "opal-berliner", name: "Opal Berliner Biber", active: true, pdf_url: "/pdfs/braas-opal-berliner-biber.pdf",
-    la_min: 145, la_max: 165, put_min: 0, put_max: 40, lat_base: 215,
+    la_min: 145, la_max: 165, krone_la_min: 290, krone_la_max: 330, krone_hb: 90,
+    put_min: 0, put_max: 40, lat_base: 215,
     laf_table: [
       { bis_grad: 30, laf: 100 },
       { bis_grad: 45, laf: 90 },
@@ -192,7 +197,8 @@ const BRAAS_MODELLE: Modell[] = [
     ],
   },
   { id: "opal-kirchen", name: "Opal Kirchenbiber", active: true, pdf_url: "/pdfs/braas-opal-kirchenbiber.pdf",
-    la_min: 145, la_max: 165, put_min: 0, put_max: 40, lat_base: 215,
+    la_min: 145, la_max: 165, krone_la_min: 290, krone_la_max: 330, krone_hb: 90,
+    put_min: 0, put_max: 40, lat_base: 215,
     laf_table: [
       { bis_grad: 30, laf: 100 },
       { bis_grad: 45, laf: 90 },
@@ -201,7 +207,7 @@ const BRAAS_MODELLE: Modell[] = [
   },
   // Biberschwanz – Opal Turmbiber (LAT1 variabel, LAT2 = 155 mm fest)
   { id: "opal-turm", name: "Opal Turmbiber", active: true, pdf_url: "/pdfs/braas-opal-turmbiber.pdf",
-    la_min: 145, la_max: 165, put_min: 0, put_max: 40, lat_base: 190,
+    la_min: 95, la_max: 115, krone_la_min: 190, krone_la_max: 230, krone_hb: 67.5, put_min: 0, put_max: 40, lat_base: 190,
     laf_table: [
       { bis_grad: 30, laf: 85 },
       { bis_grad: 45, laf: 80 },

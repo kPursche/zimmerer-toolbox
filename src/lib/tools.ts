@@ -58,9 +58,9 @@ export const TOOLS: Tool[] = [
     status: "available",
     category: "Dach",
     whatsNext: [
-      "Pfannenauswahl: weitere Hersteller werden aktiviert (Erlus, Röben, Wienerberger …)",
-      "Für die Dacheinteilung werden die Daten des ausgewählten Models übertragen.",
+      "Erlus, Jacobi & Koramic: technische Daten werden übertragen.",
       "Automatische Materialliste.",
+      "Weitere Dachformen.",
     ],
   },
   {

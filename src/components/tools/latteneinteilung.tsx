@@ -26,13 +26,15 @@ const PfannenAuswahl = dynamic(
 
 import type { Modell } from "@/components/tools/pfannen-auswahl";
 
+type Deckungsart = 'doppeldeckung' | 'kronendeckung';
+
 interface Eingaben {
   dachneigung: string;
   dachlattung: string;         // "40x60" | "30x50"
   put: string;                 // Plattenüberstand in mm
   lat: string;                 // Lattenabstand Traufe in mm (= lat_base − PÜT)
   laf: string;                 // Lattenabstand First in mm
-  einzuteilendeLaenge: string; // in mm
+  einzuteilendeLaenge: string; // in cm
 }
 
 interface LattenAbstand {
@@ -52,9 +54,11 @@ interface KiContext {
 // ─── Berechnung ───────────────────────────────────────────────────────────────
 
 interface BerechnungErgebnis {
-  la: number; // Lattenmaß in mm
-  n: number;  // Anzahl Felder
+  la: number;    // Decklänge in mm (= la_a + la_b bei Krone, = Lattenabstand bei Doppel)
+  n: number;     // Anzahl Felder (Doppel) bzw. Zyklen (Krone)
   ok: boolean;
+  la_a?: number; // kurze Teilung Kronendeckung (= HB, halbe Ziegelbreite)
+  la_b?: number; // lange Teilung Kronendeckung (= la − HB)
 }
 
 function berechneLattenmass(L: number, la_min: number, la_max: number): BerechnungErgebnis {
@@ -163,6 +167,11 @@ export function LatteneinteilungTool() {
   const [selectedModell, setSelectedModell] = useState<Modell | null>(null);
   const selectedModellRef = useRef<Modell | null>(null);
   useEffect(() => { selectedModellRef.current = selectedModell; }, [selectedModell]);
+  const [deckungsart, setDeckungsart] = useState<Deckungsart>('doppeldeckung');
+  const hatKronendeckung = !!(selectedModell?.krone_la_min && selectedModell?.krone_la_max);
+  const effLaMin = deckungsart === 'kronendeckung' && selectedModell?.krone_la_min ? selectedModell.krone_la_min : selectedModell?.la_min;
+  const effLaMax = deckungsart === 'kronendeckung' && selectedModell?.krone_la_max ? selectedModell.krone_la_max : selectedModell?.la_max;
+  const effKroneHb = deckungsart === 'kronendeckung' ? selectedModell?.krone_hb : undefined;
 
   const [isListening, setIsListening] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -186,13 +195,30 @@ export function LatteneinteilungTool() {
   const abstaendeRef = useRef<LattenAbstand[]>([]);
 
   const berechnung = useMemo((): BerechnungErgebnis | null => {
-    const L = parseFloat(eingaben.einzuteilendeLaenge.replace(',', '.'));
-    if (isNaN(L) || L <= 0 || !selectedModell?.la_min || !selectedModell?.la_max) return null;
-    return berechneLattenmass(L, selectedModell.la_min, selectedModell.la_max);
-  }, [eingaben.einzuteilendeLaenge, selectedModell]);
+    const L = parseFloat(eingaben.einzuteilendeLaenge.replace(',', '.')) * 10; // cm → mm
+    if (isNaN(L) || L <= 0 || !effLaMin || !effLaMax) return null;
+    const result = berechneLattenmass(L, effLaMin, effLaMax);
+    if (effKroneHb !== undefined) {
+      return { ...result, la_a: effKroneHb, la_b: result.la - effKroneHb };
+    }
+    return result;
+  }, [eingaben.einzuteilendeLaenge, effLaMin, effLaMax, effKroneHb]);
 
   const abstaende = useMemo(() => {
     if (!berechnung) return [];
+    if (berechnung.la_a !== undefined && berechnung.la_b !== undefined) {
+      // Kronendeckung: alternierend la_a (kurz) und la_b (lang)
+      const result: LattenAbstand[] = [];
+      let pos = 0;
+      let nr = 1;
+      for (let i = 0; i < berechnung.n; i++) {
+        pos += berechnung.la_a;
+        result.push({ nr: nr++, abstand: berechnung.la_a / 10, position: pos / 10 });
+        pos += berechnung.la_b;
+        result.push({ nr: nr++, abstand: berechnung.la_b / 10, position: pos / 10 });
+      }
+      return result;
+    }
     return lattenPositionen(berechnung.n, berechnung.la);
   }, [berechnung]);
 
@@ -393,7 +419,7 @@ export function LatteneinteilungTool() {
         setKiAntwort(null);
         const abs = abstaendeRef.current;
         const result = await askKi(transcript, {
-          gesamtMass: parseFloat(eingabenRef.current.einzuteilendeLaenge.replace(',', '.')) / 10 || null,
+          gesamtMass: parseFloat(eingabenRef.current.einzuteilendeLaenge.replace(',', '.')) || null,
           anzahlLatten: abs.length || null,
           lattenMass: abs.length > 0 ? abs[0].abstand : null,
           letzteLatte: letzteLatteRef.current,
@@ -496,6 +522,7 @@ export function LatteneinteilungTool() {
 
   const handleModellSelect = useCallback((modell: Modell | null) => {
     setSelectedModell(modell);
+    setDeckungsart('doppeldeckung');
     setEingaben(prev => {
       const updates: Partial<Eingaben> = {};
       if (modell?.put_min !== undefined && modell?.put_max !== undefined && modell?.lat_base !== undefined) {
@@ -572,7 +599,7 @@ export function LatteneinteilungTool() {
           <div className="grid grid-cols-3 gap-x-6 gap-y-0.5 text-xs">
             {selectedModell && <div><span className="font-semibold">Modell:</span> {selectedModell.name}</div>}
             {eingaben.dachneigung && <div><span className="font-semibold">Dachneigung:</span> {eingaben.dachneigung} °</div>}
-            {eingaben.einzuteilendeLaenge && <div><span className="font-semibold">Einzut. Länge:</span> {eingaben.einzuteilendeLaenge} mm</div>}
+            {eingaben.einzuteilendeLaenge && <div><span className="font-semibold">Einzut. Länge:</span> {eingaben.einzuteilendeLaenge} cm</div>}
             {eingaben.put && <div><span className="font-semibold">PÜT:</span> {eingaben.put} mm</div>}
             {eingaben.lat && <div><span className="font-semibold">LAT:</span> {eingaben.lat} mm</div>}
             {eingaben.laf && <div><span className="font-semibold">LAF:</span> {eingaben.laf} mm</div>}
@@ -580,7 +607,9 @@ export function LatteneinteilungTool() {
           </div>
           {berechnung && (
             <div className="font-semibold text-sm border-t pt-1">
-              LA = {berechnung.la.toFixed(1)} mm ({(berechnung.la / 10).toFixed(1)} cm) · {berechnung.n} Felder
+              {berechnung.la_a !== undefined && berechnung.la_b !== undefined
+                ? `LA1 = ${(berechnung.la_a / 10).toFixed(1)} cm · LA2 = ${(berechnung.la_b / 10).toFixed(1)} cm · ${berechnung.n} Zyklen · ${berechnung.n * 2} Latten`
+                : `LA = ${berechnung.la.toFixed(1)} mm (${(berechnung.la / 10).toFixed(1)} cm) · ${berechnung.n} Felder`}
               {!berechnung.ok && " ⚠ außerhalb des zulässigen Bereichs!"}
             </div>
           )}
@@ -630,6 +659,25 @@ export function LatteneinteilungTool() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {hatKronendeckung && (
+            <div className="flex gap-2">
+              {(['doppeldeckung', 'kronendeckung'] as const).map(art => (
+                <button
+                  key={art}
+                  type="button"
+                  onClick={() => setDeckungsart(art)}
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                    deckungsart === art
+                      ? 'border-oak bg-oak text-white'
+                      : 'border-input bg-background text-foreground hover:bg-accent'
+                  }`}
+                >
+                  {art === 'doppeldeckung' ? 'Doppeldeckung' : 'Kronendeckung'}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="dachneigung">Dachneigung (°)</Label>
@@ -706,7 +754,7 @@ export function LatteneinteilungTool() {
                   </div>
                   <div>
                     <Label htmlFor="einzuteilendeLaenge">
-                      Einzuteilende Länge (mm)
+                      Einzuteilende Länge (cm)
                       <span className="ml-1 text-xs font-normal text-muted-foreground">(Kons.länge – LAT – LAF)</span>
                     </Label>
                     <Input
@@ -715,7 +763,7 @@ export function LatteneinteilungTool() {
                       disabled={!dnOk}
                       value={eingaben.einzuteilendeLaenge}
                       onChange={(e) => handleInputChange('einzuteilendeLaenge', e.target.value)}
-                      placeholder="z.B. 4500"
+                      placeholder="z.B. 450"
                     />
                   </div>
 
@@ -729,9 +777,9 @@ export function LatteneinteilungTool() {
             })()}
           </div>
 
-          {selectedModell?.la_min && selectedModell?.la_max && (
+          {effLaMin && effLaMax && selectedModell && (
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-              <span>LA {selectedModell.la_min}–{selectedModell.la_max} mm</span>
+              <span>LA {effLaMin}–{effLaMax} mm</span>
               {selectedModell.put_min !== undefined && selectedModell.put_max !== undefined && (
                 <span>PÜT {selectedModell.put_min}–{selectedModell.put_max} mm</span>
               )}
@@ -753,20 +801,36 @@ export function LatteneinteilungTool() {
 
           {berechnung && (
             <div className="pt-2 border-t space-y-1">
-              <Badge
-                variant={berechnung.ok ? "default" : "destructive"}
-                className="text-base font-semibold"
-              >
-                LA = {berechnung.la.toFixed(1)} mm ({(berechnung.la / 10).toFixed(1)} cm)
-              </Badge>
-              <p className="text-sm text-muted-foreground">
-                {berechnung.n} Felder
-                {!berechnung.ok && " – außerhalb des zulässigen Bereichs!"}
-              </p>
+              {berechnung.la_a !== undefined && berechnung.la_b !== undefined ? (
+                <>
+                  <div className="flex gap-2 flex-wrap">
+                    <Badge variant={berechnung.ok ? "default" : "destructive"} className="text-base font-semibold">
+                      LA1 = {(berechnung.la_a / 10).toFixed(1)} cm
+                    </Badge>
+                    <Badge variant={berechnung.ok ? "default" : "destructive"} className="text-base font-semibold">
+                      LA2 = {(berechnung.la_b / 10).toFixed(1)} cm
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {berechnung.n} Zyklen · {berechnung.n * 2} Latten · Decklänge {berechnung.la.toFixed(1)} mm
+                    {!berechnung.ok && " – außerhalb des zulässigen Bereichs!"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Badge variant={berechnung.ok ? "default" : "destructive"} className="text-base font-semibold">
+                    LA = {berechnung.la.toFixed(1)} mm ({(berechnung.la / 10).toFixed(1)} cm)
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">
+                    {berechnung.n} Felder
+                    {!berechnung.ok && " – außerhalb des zulässigen Bereichs!"}
+                  </p>
+                </>
+              )}
             </div>
           )}
 
-          {!selectedModell?.la_min && selectedModell && (
+          {!effLaMin && selectedModell && (
             <p className="text-xs text-muted-foreground">
               Für {selectedModell.name} sind noch keine Lattenabstandswerte hinterlegt.
             </p>
