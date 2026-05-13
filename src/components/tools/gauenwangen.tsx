@@ -224,7 +224,9 @@ const p = useMemo(() => ({
           ? laRaw
           : applyMindestversatz(laRaw, prevJointOffset, pb, mv);
 
-        let s: number = -uH + la;
+        // Startposition: bei coY ≥ hvorne beginnt die Platte an der Gaubendachlinie
+        const xStart = coY >= p.hvorne ? (coY - p.hvorne) / tanG : -uH;
+        let s: number = xStart + la;
         while (s < sEnd) s += pb;
         const abschnitt: number = s - sEnd;
 
@@ -653,13 +655,15 @@ function GaubenwangeKonturSVG({
       const la: number = r === 0
         ? laRaw
         : applyMindestversatz(laRaw, prevJointOffW, pb, mindestversatz);
+      // Startposition: bei coYw ≥ hvorne beginnt die Platte an der Gaubendachlinie
+      const xStartW = coYw >= hvorne ? (coYw - hvorne) / tanG : -ueberstand;
       const platesW: PlateW[] = [];
       if (r === 0) {
-        let s = -ueberstand;
+        let s = xStartW;
         while (s < sEnd) { platesW.push({ start: s, len: pb }); s += pb; }
       } else {
-        platesW.push({ start: -ueberstand, len: la });
-        let s = -ueberstand + la;
+        platesW.push({ start: xStartW, len: la });
+        let s = xStartW + la;
         while (s < sEnd) { platesW.push({ start: s, len: pb }); s += pb; }
       }
       const lastW      = platesW[platesW.length - 1];
@@ -892,17 +896,33 @@ function GaubenwangeKonturSVG({
           })
         )}
         {allRowsW.map(({ r, coY, ph, sEnd }) => {
-          const xBot = coY / tanA;
-          const xTop = sEnd;
-          if (sx(xTop) > SVG_W + 20) return null;
+          const isUpper = coY >= hvorne;
+          // Rechte Schmiege (Hauptdach α)
+          const xBotR = coY / tanA;
+          const xTopR = sEnd;
+          // Linke Schmiege (Gaubendach γ) — nur für obere Reihen
+          const xBotL = isUpper ? (coY - hvorne) / tanG : null;
+          const xTopL = isUpper ? (coY + ph - hvorne) / tanG : null;
           return (
             <g key={`vm${r}`}>
-              <line x1={sx(xBot)} y1={sy(coY)} x2={sx(xTop)} y2={sy(coY + ph)}
+              {/* Hauptdach-Schmiege rechts */}
+              <line x1={sx(xBotR)} y1={sy(coY)} x2={sx(xTopR)} y2={sy(coY + ph)}
                 stroke="#d47070" strokeWidth="1.2" strokeDasharray="4 2" />
-              <text x={sx((xBot + xTop) / 2) + 8} y={sy(coY + ph / 2)}
+              <text x={sx((xBotR + xTopR) / 2) + 8} y={sy(coY + ph / 2)}
                 fontSize="7.5" fill="#d47070" dominantBaseline="middle">
-                v={fmt(round1(ph / tanA))} cm
+                vα={fmt(round1(ph / tanA))} cm
               </text>
+              {/* Gaubendach-Schmiege links (nur obere Reihen) */}
+              {isUpper && xBotL !== null && xTopL !== null && (
+                <>
+                  <line x1={sx(xBotL)} y1={sy(coY)} x2={sx(xTopL)} y2={sy(coY + ph)}
+                    stroke="#6fa8d4" strokeWidth="1.2" strokeDasharray="4 2" />
+                  <text x={sx((xBotL + xTopL) / 2) - 8} y={sy(coY + ph / 2)}
+                    fontSize="7.5" fill="#6fa8d4" textAnchor="end" dominantBaseline="middle">
+                    vγ={fmt(round1(ph / tanG))} cm
+                  </text>
+                </>
+              )}
             </g>
           );
         })}
