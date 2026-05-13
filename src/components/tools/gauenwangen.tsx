@@ -197,6 +197,8 @@ const p = useMemo(() => ({
 
     if (ep.verlegeart === 'waagerecht') {
       const tanA = Math.tan(toRad(p.alpha));
+      const tanG = Math.tan(toRad(p.gamma));
+      const yF   = (p.hvorne / (tanA - tanG)) * tanA; // Firsthöhe (Ecke B)
       const pb   = parseFloat(ep.platteBreite) || 250;
       const ph0  = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
       const phN  = parseFloat(ep.platteHoehe) || 62.5;
@@ -211,7 +213,8 @@ const p = useMemo(() => ({
 
       for (let r = 0; r < 60; r++) {
         const ph   = r === 0 ? ph0 : phN;
-        const sEnd = (coY + ph) / tanA;
+        if (coY >= yF) break;
+        const sEnd = Math.min((coY + ph) / tanA, yF / tanA); // nie über B hinaus
         if (sEnd <= 0.1) break;
 
         const laRaw: number = firstLen ?? pb;
@@ -229,7 +232,6 @@ const p = useMemo(() => ({
         coY             += ph;
         prevJointOffset  = r === 0 ? 0 : la;
         firstLen         = abschnitt - 5;
-        if (coY >= p.hvorne) break;
       }
       return rowsW;
     }
@@ -638,12 +640,13 @@ function GaubenwangeKonturSVG({
   type RowW   = { r: number; coY: number; ph: number; sEnd: number; plates: PlateW[]; abschnitt: number };
   const allRowsW: RowW[] = [];
   if (verlegeart === 'waagerecht') {
-    let coY             = 0;
+    let coYw             = 0;
     let firstLenW: number | null = null;
     let prevJointOffW   = 0;
     for (let r = 0; r < 60; r++) {
       const ph    = r === 0 ? platteHoeheFirst : platteHoeheNorm;
-      const sEnd  = (coY + ph) / tanA;
+      if (coYw >= yF) break;
+      const sEnd  = Math.min((coYw + ph) / tanA, T); // nie über B hinaus
       if (sEnd <= 0.1) break;
       const laRaw: number = firstLenW ?? pb;
       if (firstLenW !== null && laRaw <= 0) break;
@@ -661,11 +664,10 @@ function GaubenwangeKonturSVG({
       }
       const lastW      = platesW[platesW.length - 1];
       const abschnittW = lastW.start + lastW.len - sEnd;
-      allRowsW.push({ r, coY, ph, sEnd, plates: platesW, abschnitt: abschnittW });
-      coY             += ph;
+      allRowsW.push({ r, coY: coYw, ph, sEnd, plates: platesW, abschnitt: abschnittW });
+      coYw             += ph;
       prevJointOffW    = r === 0 ? 0 : la;
       firstLenW        = abschnittW - 5;
-      if (coY >= hvorne) break;
     }
   }
 
@@ -757,15 +759,19 @@ function GaubenwangeKonturSVG({
         )}
       </>}
 
-      {/* ── Waagerecht-Modus: Geisterplatten ── */}
-      {verlegeart === 'waagerecht' && allRowsW.flatMap(({ r, coY, ph, plates }) =>
-        plates.map(({ start, len }, i) => (
-          <polygon key={`gw${r}-${i}`}
-            points={polyStr(eckenW(start, len, coY, ph))}
-            fill={fillCol(r)} fillOpacity="0.05"
-            stroke={fillCol(r)} strokeWidth="0.8" strokeDasharray="5 3" opacity="0.45"
-          />
-        ))
+      {/* ── Waagerecht-Modus: Geisterplatten (nur bis sEnd, kein Off-Cut rechts) ── */}
+      {verlegeart === 'waagerecht' && allRowsW.flatMap(({ r, coY, ph, plates, sEnd }) =>
+        plates.map(({ start, len }, i) => {
+          const visEnd = Math.min(start + len, sEnd);
+          if (visEnd <= start) return null;
+          return (
+            <polygon key={`gw${r}-${i}`}
+              points={polyStr(eckenW(start, visEnd - start, coY, ph))}
+              fill={fillCol(r)} fillOpacity="0.05"
+              stroke={fillCol(r)} strokeWidth="0.8" strokeDasharray="5 3" opacity="0.45"
+            />
+          );
+        })
       )}
 
       {/* Wand-Außenkontur */}
