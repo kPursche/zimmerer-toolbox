@@ -511,22 +511,22 @@ const p = useMemo(() => ({
                 mindestversatz={parseFloat(ep.mindestversatz) || 0}
                 verlegeart={ep.verlegeart}
               />
-              {ep.verlegeart === 'waagerecht' && (() => {
-                const phRow = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
+              {ep.verlegeart === 'waagerecht' && plattenErg && plattenErg.length > 0 && (() => {
+                const ph0 = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
+                const phN = parseFloat(ep.platteHoehe) || 62.5;
                 const pbRow = parseFloat(ep.platteBreite) || 250;
-                const uH    = parseFloat(ep.ueberstand) || 0;
-                const vA    = phRow / Math.tan(toRad(p.alpha));
-                if (uH + vA > pbRow) return null;
+                const uH = parseFloat(ep.ueberstand) || 0;
                 return (
                   <div className="space-y-2 rounded-md border border-border bg-s2 px-4 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-mu">
-                      Zuschnitt — 1. Platte (Reihe 1)
+                      Zuschnittplan
                     </p>
-                    <PlattenZuschnittSkizze pb={pbRow} ph={phRow} alpha={p.alpha} ueberstand={uH} />
-                    <p className="text-[11px] text-mu">
-                      vα = {fmt(phRow)} cm / tan {fmt(p.alpha)}° ={' '}
-                      <strong className="text-tx">{fmt(round1(vA))} cm</strong>
-                    </p>
+                    <AllePlattenSkizze
+                      pb={pbRow} ph0={ph0} phN={phN}
+                      alpha={p.alpha} gamma={p.gamma}
+                      hvorne={p.hvorne} ueberstand={uH}
+                      rows={plattenErg}
+                    />
                   </div>
                 );
               })()}
@@ -995,119 +995,136 @@ function HDimLine({ x1, x2, y, label, col, above }: {
   );
 }
 
-function PlattenZuschnittSkizze({ pb, ph, alpha, ueberstand }: {
-  pb: number; ph: number; alpha: number; ueberstand: number;
+function AllePlattenSkizze({ pb, ph0, phN, alpha, gamma, hvorne, ueberstand, rows }: {
+  pb: number; ph0: number; phN: number;
+  alpha: number; gamma: number; hvorne: number; ueberstand: number;
+  rows: Array<{ r: number; la: number; abschnitt: number }>;
 }) {
-  const tanA   = Math.tan(toRad(alpha));
-  const vA     = ph / tanA;
-  const abschn = pb - ueberstand - vA;
+  const tanA = Math.tan(toRad(alpha));
+  const tanG = Math.tan(toRad(gamma));
+  const T    = hvorne / (tanA - tanG);
 
-  const PAD_L = 20; const PAD_R = 90; const PAD_T = 44; const PAD_B = 44;
-  const sc     = Math.min((380 - PAD_L - PAD_R) / pb, (200 - PAD_T - PAD_B) / ph);
-  const totalW = Math.round(pb * sc + PAD_L + PAD_R);
-  const totalH = Math.round(ph * sc + PAD_T + PAD_B);
+  type RD = {
+    r: number; ph: number; coY: number;
+    plates: { dispX: number; w: number }[];
+    cutBotDX: number; cutTopDX: number;
+    abschnitt: number; isUpper: boolean; vG: number;
+  };
 
-  const px = (x: number) => PAD_L + x * sc;
-  const py = (y: number) => PAD_T + (ph - y) * sc;
+  const rds: RD[] = [];
+  let coY = 0;
+  for (const { r, la, abschnitt } of rows) {
+    const ph     = r === 0 ? ph0 : phN;
+    const xStart = coY >= hvorne ? (coY - hvorne) / tanG : -ueberstand;
+    const sTopW  = Math.min((coY + ph) / tanA, T);
+    const cBotDX = Math.max(0, Math.min(coY / tanA, T) - xStart);
+    const cTopDX = sTopW - xStart;
 
-  const pBot    = py(0);
-  const pTop    = py(ph);
-  const pL      = px(0);
-  const pR      = px(pb);
-  const cutBotX = px(ueberstand);
-  const cutTopX = px(ueberstand + vA);
+    const plates: { dispX: number; w: number }[] = [];
+    plates.push({ dispX: 0, w: r === 0 ? pb : la });
+    let dX = r === 0 ? pb : la;
+    while (dX < cTopDX + 0.1) { plates.push({ dispX: dX, w: pb }); dX += pb; }
 
-  const dimTopY   = pTop - 28;
-  const dimBotY   = pBot + 22;
-  const dimRightX = pR + 22;
+    rds.push({ r, ph, coY, plates, cutBotDX: cBotDX, cutTopDX: cTopDX, abschnitt, isUpper: coY >= hvorne, vG: ph / tanG });
+    coY += ph;
+  }
 
-  const ext = (x1: number, y1: number, x2: number, y2: number) => (
-    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#bbb" strokeWidth="0.6" strokeDasharray="2 2" />
-  );
+  const totalPh = coY;
+  const maxDW   = Math.max(...rds.map(rd => { const l = rd.plates[rd.plates.length - 1]; return l.dispX + l.w; }));
+
+  const PAD_L = 46; const PAD_R = 22; const PAD_T = 28; const PAD_B = 42;
+  const sc    = Math.min((480 - PAD_L - PAD_R) / maxDW, (440 - PAD_T - PAD_B) / totalPh, 2.2);
+  const SVG_W = Math.round(maxDW * sc + PAD_L + PAD_R);
+  const SVG_H = Math.round(totalPh * sc + PAD_T + PAD_B);
+
+  const sx  = (x: number) => PAD_L + x * sc;
+  const syB = (y: number) => PAD_T + (totalPh - y) * sc;
+  const syT = (y: number, h: number) => PAD_T + (totalPh - y - h) * sc;
 
   return (
-    <svg viewBox={`0 0 ${totalW} ${totalH}`} className="w-full overflow-visible"
-      aria-label="Zuschnittskizze erste Platte Reihe 1">
+    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full overflow-visible"
+      aria-label="Zuschnittplan alle Reihen und Platten">
 
-      {/* Linkes Stück (Reihe 1, auf der Wange) — blau */}
-      <polygon
-        points={`${pL},${pBot} ${cutBotX},${pBot} ${cutTopX},${pTop} ${pL},${pTop}`}
-        fill="#6fa8d4" fillOpacity="0.22" stroke="none"
-      />
-      {/* Rechtes Stück (Abschnitt) — grün */}
-      <polygon
-        points={`${cutBotX},${pBot} ${pR},${pBot} ${pR},${pTop} ${cutTopX},${pTop}`}
-        fill="#7fb87a" fillOpacity="0.18" stroke="none"
-      />
+      {rds.map(({ r, ph, coY, plates, cutBotDX, cutTopDX, abschnitt, isUpper, vG }) => {
+        const yB  = syB(coY);
+        const yT  = syT(coY, ph);
+        const col = r % 2 === 0 ? '#6fa8d4' : '#7fb87a';
 
-      {/* Plattenrahmen */}
-      <rect x={pL} y={pTop} width={pb * sc} height={ph * sc}
-        fill="none" stroke="#504840" strokeWidth="1.5" />
+        return (
+          <g key={r}>
+            {plates.map(({ dispX, w }, i) => {
+              const isLast = i === plates.length - 1;
+              const xL = sx(dispX);
+              if (isLast) {
+                const cBotX = sx(Math.max(dispX, cutBotDX));
+                const cTopX = sx(cutTopDX);
+                return (
+                  <g key={i}>
+                    <polygon points={`${xL},${yB} ${cBotX},${yB} ${cTopX},${yT} ${xL},${yT}`}
+                      fill={col} fillOpacity="0.22" stroke={col} strokeWidth="1.1" />
+                    <polygon points={`${cBotX},${yB} ${sx(dispX + w)},${yB} ${sx(dispX + w)},${yT} ${cTopX},${yT}`}
+                      fill="#c9924a" fillOpacity="0.15" stroke="#c9924a" strokeWidth="1.1" strokeDasharray="4 2" />
+                    <line x1={cBotX} y1={yB} x2={cTopX} y2={yT}
+                      stroke="#d47070" strokeWidth="1.6" strokeDasharray="5 2" />
+                    {abschnitt > 3 && (
+                      <text x={(cTopX + sx(dispX + w)) / 2} y={(yT + yB) / 2}
+                        fontSize="7.5" fill="#c9924a" textAnchor="middle" dominantBaseline="middle" fontWeight="700">
+                        {fmt(round1(abschnitt))} cm
+                      </text>
+                    )}
+                  </g>
+                );
+              }
+              return (
+                <rect key={i} x={xL} y={yT} width={w * sc} height={yB - yT}
+                  fill={col} fillOpacity={i % 2 === 0 ? 0.20 : 0.12} stroke={col} strokeWidth="1.1" />
+              );
+            })}
 
-      {/* Schnittlinie */}
-      <line x1={cutBotX} y1={pBot} x2={cutTopX} y2={pTop}
-        stroke="#d47070" strokeWidth="2" strokeDasharray="5.5 2.5" />
+            {/* Gaubendach-Schmiege (obere Reihen) */}
+            {isUpper && (
+              <line x1={sx(0)} y1={yB} x2={sx(Math.min(vG, cutTopDX))} y2={yT}
+                stroke="#6fa8d4" strokeWidth="1.5" strokeDasharray="5 2" />
+            )}
 
-      {/* Stücklabels */}
-      <text x={(pL + cutTopX) / 2} y={(pTop + pBot) / 2}
-        fontSize="8.5" fill="#2563ab" textAnchor="middle" dominantBaseline="middle" fontWeight="700">
-        Reihe 1
-      </text>
-      {abschn > 8 && (
-        <text x={(cutTopX + pR) / 2} y={(pTop + pBot) / 2}
-          fontSize="8.5" fill="#3a6e42" textAnchor="middle" dominantBaseline="middle" fontWeight="700">
-          Abschnitt
-        </text>
+            {/* Erstes Stück — Länge wenn < pb */}
+            {r > 0 && plates[0].w < pb * 0.98 && (
+              <text x={sx(plates[0].w / 2)} y={(yT + yB) / 2}
+                fontSize="7.5" fill={col} textAnchor="middle" dominantBaseline="middle" fontWeight="700">
+                {fmt(round1(plates[0].w))} cm
+              </text>
+            )}
+
+            <text x={PAD_L - 5} y={(yT + yB) / 2}
+              fontSize="9" fill={col} textAnchor="end" dominantBaseline="middle" fontWeight="700">
+              R{r + 1}
+            </text>
+            <line x1={PAD_L} y1={yT} x2={SVG_W - PAD_R} y2={yT} stroke="#ccc" strokeWidth="0.5" />
+          </g>
+        );
+      })}
+
+      <line x1={PAD_L} y1={syB(0)} x2={SVG_W - PAD_R} y2={syB(0)} stroke="#ccc" strokeWidth="0.5" />
+
+      {/* Plattenbreite-Referenzlinie */}
+      <line x1={sx(0)} y1={syB(0)} x2={sx(0)} y2={syB(0) + 18} stroke="#bbb" strokeWidth="0.6" strokeDasharray="2 2" />
+      <line x1={sx(pb)} y1={syB(0)} x2={sx(pb)} y2={syB(0) + 18} stroke="#bbb" strokeWidth="0.6" strokeDasharray="2 2" />
+      <HDimLine x1={sx(0)} x2={sx(pb)} y={syB(0) + 20}
+        label={`pb = ${fmt(pb)} cm`} col="#888" above={false} />
+
+      {/* Winkelbezeichnung */}
+      {rds.length > 0 && (
+        <text x={sx(rds[rds.length - 1].cutTopDX) + 3}
+          y={syT(rds[rds.length - 1].coY, rds[rds.length - 1].ph) - 4}
+          fontSize="7.5" fill="#d47070" fontWeight="600">α={fmt(alpha)}°</text>
       )}
-
-      {/* Winkelbezeichnung α am unteren Schnittpunkt */}
-      <text x={cutBotX + 7} y={pBot - 7} fontSize="8.5" fill="#d47070" fontWeight="600">
-        α = {fmt(alpha)}°
-      </text>
-
-      {/* Extension lines oben */}
-      {ext(pL, pTop, pL, dimTopY + 4)}
-      {ext(cutTopX, pTop, cutTopX, dimTopY + 4)}
-      {ext(pR, pTop, pR, dimTopY + 4)}
-
-      {/* Maßlinie oben links: vα (oder Ü+vα) */}
-      <HDimLine x1={pL} x2={cutTopX} y={dimTopY}
-        label={ueberstand > 0 ? `Ü+vα = ${fmt(round1(ueberstand + vA))} cm` : `vα = ${fmt(round1(vA))} cm`}
-        col="#d47070" above={true} />
-
-      {/* Maßlinie oben rechts: Abschnitt */}
-      {abschn > 0 && (
-        <HDimLine x1={cutTopX} x2={pR} y={dimTopY}
-          label={`Abschn. = ${fmt(round1(abschn))} cm`} col="#3a7f48" above={true} />
-      )}
-
-      {/* Extension lines unten */}
-      {ext(pL, pBot, pL, dimBotY - 4)}
-      {ext(pR, pBot, pR, dimBotY - 4)}
-
-      {/* Maßlinie unten: Plattenbreite */}
-      <HDimLine x1={pL} x2={pR} y={dimBotY}
-        label={`Plattenbreite = ${fmt(pb)} cm`} col="#555" above={false} />
-
-      {/* Überstand-Maßlinie */}
-      {ueberstand > 0 && (
-        <>
-          {ext(cutBotX, pBot, cutBotX, dimBotY - 4)}
-          <HDimLine x1={pL} x2={cutBotX} y={dimBotY + 18}
-            label={`Ü = ${fmt(ueberstand)} cm`} col="#6fa8d4" above={false} />
-        </>
-      )}
-
-      {/* Extension lines rechts */}
-      {ext(pR, pTop, dimRightX - 4, pTop)}
-      {ext(pR, pBot, dimRightX - 4, pBot)}
-
-      {/* Maßlinie rechts: Plattenhöhe */}
-      <line x1={dimRightX} y1={pTop} x2={dimRightX} y2={pBot} stroke="#555" strokeWidth="1" />
-      <line x1={dimRightX - 3.5} y1={pTop} x2={dimRightX + 3.5} y2={pTop} stroke="#555" strokeWidth="1" />
-      <line x1={dimRightX - 3.5} y1={pBot} x2={dimRightX + 3.5} y2={pBot} stroke="#555" strokeWidth="1" />
-      <text x={dimRightX + 7} y={(pTop + pBot) / 2 + 4}
-        fontSize="8" fill="#555" dominantBaseline="middle">{fmt(ph)} cm</text>
+      {rds.some(rd => rd.isUpper) && (() => {
+        const fu = rds.find(rd => rd.isUpper);
+        return fu ? (
+          <text x={sx(0) - 4} y={syT(fu.coY, fu.ph) - 4}
+            fontSize="7.5" fill="#6fa8d4" fontWeight="600" textAnchor="end">γ={fmt(gamma)}°</text>
+        ) : null;
+      })()}
     </svg>
   );
 }
