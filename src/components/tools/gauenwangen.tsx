@@ -511,6 +511,25 @@ const p = useMemo(() => ({
                 mindestversatz={parseFloat(ep.mindestversatz) || 0}
                 verlegeart={ep.verlegeart}
               />
+              {ep.verlegeart === 'waagerecht' && (() => {
+                const phRow = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
+                const pbRow = parseFloat(ep.platteBreite) || 250;
+                const uH    = parseFloat(ep.ueberstand) || 0;
+                const vA    = phRow / Math.tan(toRad(p.alpha));
+                if (uH + vA > pbRow) return null;
+                return (
+                  <div className="space-y-2 rounded-md border border-border bg-s2 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-mu">
+                      Zuschnitt — 1. Platte (Reihe 1)
+                    </p>
+                    <PlattenZuschnittSkizze pb={pbRow} ph={phRow} alpha={p.alpha} ueberstand={uH} />
+                    <p className="text-[11px] text-mu">
+                      vα = {fmt(phRow)} cm / tan {fmt(p.alpha)}° ={' '}
+                      <strong className="text-tx">{fmt(round1(vA))} cm</strong>
+                    </p>
+                  </div>
+                );
+              })()}
               {plattenErg && plattenErg.length > 0 && (
                 <div className="rounded-md border border-border bg-s2 px-4 py-3 space-y-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-mu">
@@ -954,6 +973,141 @@ function GaubenwangeKonturSVG({
       <text x={wB.x + 4} y={(wB.y + wA.y) / 2} fontSize="8" fill="#888" dominantBaseline="middle">
         {fmt(round1(yF))} cm
       </text>
+    </svg>
+  );
+}
+
+// ─── Plattenzuschnitt-Skizze ──────────────────────────────────────────────────
+
+function HDimLine({ x1, x2, y, label, col, above }: {
+  x1: number; x2: number; y: number; label: string; col: string; above: boolean;
+}) {
+  const mid = (x1 + x2) / 2;
+  const tk  = 3.5;
+  return (
+    <g>
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke={col} strokeWidth="1" />
+      <line x1={x1} y1={y - tk} x2={x1} y2={y + tk} stroke={col} strokeWidth="1" />
+      <line x1={x2} y1={y - tk} x2={x2} y2={y + tk} stroke={col} strokeWidth="1" />
+      <text x={mid} y={above ? y - 5 : y + 11}
+        fontSize="8" fill={col} textAnchor="middle" fontWeight="600">{label}</text>
+    </g>
+  );
+}
+
+function PlattenZuschnittSkizze({ pb, ph, alpha, ueberstand }: {
+  pb: number; ph: number; alpha: number; ueberstand: number;
+}) {
+  const tanA   = Math.tan(toRad(alpha));
+  const vA     = ph / tanA;
+  const abschn = pb - ueberstand - vA;
+
+  const PAD_L = 20; const PAD_R = 90; const PAD_T = 44; const PAD_B = 44;
+  const sc     = Math.min((380 - PAD_L - PAD_R) / pb, (200 - PAD_T - PAD_B) / ph);
+  const totalW = Math.round(pb * sc + PAD_L + PAD_R);
+  const totalH = Math.round(ph * sc + PAD_T + PAD_B);
+
+  const px = (x: number) => PAD_L + x * sc;
+  const py = (y: number) => PAD_T + (ph - y) * sc;
+
+  const pBot    = py(0);
+  const pTop    = py(ph);
+  const pL      = px(0);
+  const pR      = px(pb);
+  const cutBotX = px(ueberstand);
+  const cutTopX = px(ueberstand + vA);
+
+  const dimTopY   = pTop - 28;
+  const dimBotY   = pBot + 22;
+  const dimRightX = pR + 22;
+
+  const ext = (x1: number, y1: number, x2: number, y2: number) => (
+    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#bbb" strokeWidth="0.6" strokeDasharray="2 2" />
+  );
+
+  return (
+    <svg viewBox={`0 0 ${totalW} ${totalH}`} className="w-full overflow-visible"
+      aria-label="Zuschnittskizze erste Platte Reihe 1">
+
+      {/* Linkes Stück (Reihe 1, auf der Wange) — blau */}
+      <polygon
+        points={`${pL},${pBot} ${cutBotX},${pBot} ${cutTopX},${pTop} ${pL},${pTop}`}
+        fill="#6fa8d4" fillOpacity="0.22" stroke="none"
+      />
+      {/* Rechtes Stück (Abschnitt) — grün */}
+      <polygon
+        points={`${cutBotX},${pBot} ${pR},${pBot} ${pR},${pTop} ${cutTopX},${pTop}`}
+        fill="#7fb87a" fillOpacity="0.18" stroke="none"
+      />
+
+      {/* Plattenrahmen */}
+      <rect x={pL} y={pTop} width={pb * sc} height={ph * sc}
+        fill="none" stroke="#504840" strokeWidth="1.5" />
+
+      {/* Schnittlinie */}
+      <line x1={cutBotX} y1={pBot} x2={cutTopX} y2={pTop}
+        stroke="#d47070" strokeWidth="2" strokeDasharray="5.5 2.5" />
+
+      {/* Stücklabels */}
+      <text x={(pL + cutTopX) / 2} y={(pTop + pBot) / 2}
+        fontSize="8.5" fill="#2563ab" textAnchor="middle" dominantBaseline="middle" fontWeight="700">
+        Reihe 1
+      </text>
+      {abschn > 8 && (
+        <text x={(cutTopX + pR) / 2} y={(pTop + pBot) / 2}
+          fontSize="8.5" fill="#3a6e42" textAnchor="middle" dominantBaseline="middle" fontWeight="700">
+          Abschnitt
+        </text>
+      )}
+
+      {/* Winkelbezeichnung α am unteren Schnittpunkt */}
+      <text x={cutBotX + 7} y={pBot - 7} fontSize="8.5" fill="#d47070" fontWeight="600">
+        α = {fmt(alpha)}°
+      </text>
+
+      {/* Extension lines oben */}
+      {ext(pL, pTop, pL, dimTopY + 4)}
+      {ext(cutTopX, pTop, cutTopX, dimTopY + 4)}
+      {ext(pR, pTop, pR, dimTopY + 4)}
+
+      {/* Maßlinie oben links: vα (oder Ü+vα) */}
+      <HDimLine x1={pL} x2={cutTopX} y={dimTopY}
+        label={ueberstand > 0 ? `Ü+vα = ${fmt(round1(ueberstand + vA))} cm` : `vα = ${fmt(round1(vA))} cm`}
+        col="#d47070" above={true} />
+
+      {/* Maßlinie oben rechts: Abschnitt */}
+      {abschn > 0 && (
+        <HDimLine x1={cutTopX} x2={pR} y={dimTopY}
+          label={`Abschn. = ${fmt(round1(abschn))} cm`} col="#3a7f48" above={true} />
+      )}
+
+      {/* Extension lines unten */}
+      {ext(pL, pBot, pL, dimBotY - 4)}
+      {ext(pR, pBot, pR, dimBotY - 4)}
+
+      {/* Maßlinie unten: Plattenbreite */}
+      <HDimLine x1={pL} x2={pR} y={dimBotY}
+        label={`Plattenbreite = ${fmt(pb)} cm`} col="#555" above={false} />
+
+      {/* Überstand-Maßlinie */}
+      {ueberstand > 0 && (
+        <>
+          {ext(cutBotX, pBot, cutBotX, dimBotY - 4)}
+          <HDimLine x1={pL} x2={cutBotX} y={dimBotY + 18}
+            label={`Ü = ${fmt(ueberstand)} cm`} col="#6fa8d4" above={false} />
+        </>
+      )}
+
+      {/* Extension lines rechts */}
+      {ext(pR, pTop, dimRightX - 4, pTop)}
+      {ext(pR, pBot, dimRightX - 4, pBot)}
+
+      {/* Maßlinie rechts: Plattenhöhe */}
+      <line x1={dimRightX} y1={pTop} x2={dimRightX} y2={pBot} stroke="#555" strokeWidth="1" />
+      <line x1={dimRightX - 3.5} y1={pTop} x2={dimRightX + 3.5} y2={pTop} stroke="#555" strokeWidth="1" />
+      <line x1={dimRightX - 3.5} y1={pBot} x2={dimRightX + 3.5} y2={pBot} stroke="#555" strokeWidth="1" />
+      <text x={dimRightX + 7} y={(pTop + pBot) / 2 + 4}
+        fontSize="8" fill="#555" dominantBaseline="middle">{fmt(ph)} cm</text>
     </svg>
   );
 }
