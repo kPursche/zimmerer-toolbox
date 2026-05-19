@@ -79,13 +79,13 @@ export const TOOLS: Tool[] = [
     description:
       "Grundriss mit dem Finger zeichnen, Kanten als Traufe/Walm/Giebel beschriften und First, Grate, Sparrenlängen in mm berechnen.",
     icon: Home,
-    status: "coming-soon",
+    status: "available",
     category: "Dach",
     whatsNext: [
-      "Touch-Zeichenfläche mit Glättung",
-      "Pro Kante eigene Neigung",
-      "Speichern in localStorage",
       "L-/T-förmige Grundrisse mit Kehlen",
+      "Mehrere Projekte verwalten",
+      "Sparrenliste als PDF exportieren",
+      "3D-Vorschau des Skeletts",
     ],
   },
   {
