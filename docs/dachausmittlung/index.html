@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Walmdach - Draufsicht</title>
+<style>
+  body{margin:0;padding:14px;font-family:-apple-system,Arial,sans-serif;background:#fafafa;color:#222;text-align:center}
+  h1{font-size:18px;margin:0 0 4px}
+  p{margin:0 0 10px;font-size:13px;color:#555}
+  .frame{border:1px solid #ddd;background:white;border-radius:6px;padding:8px;display:inline-block;max-width:100%}
+  img,canvas{max-width:100%;height:auto;display:block}
+  button{font-size:15px;padding:11px 18px;background:#1565c0;color:white;border:0;border-radius:6px;margin:14px 6px;cursor:pointer;font-weight:600}
+  button:active{background:#0d47a1}
+  .hint{font-size:12px;color:#777;margin-top:10px;line-height:1.5}
+  .hint a{color:#1565c0}
+</style>
+</head>
+<body>
+<h1>Walmdach &ndash; Draufsicht</h1>
+<p>Grundriss 12,00 &times; 8,00 m &middot; Hauptdach 45&deg; &middot; Walm 55&deg;</p>
+
+<div class="frame">
+  <img id="svgImg" src="walmdach_draufsicht.svg" alt="Walmdach Draufsicht"/>
+</div>
+
+<div>
+  <button id="dlJpg">Als JPG speichern</button>
+  <button id="dlPng">Als PNG speichern</button>
+</div>
+
+<canvas id="cv" style="display:none"></canvas>
+
+<p class="hint">
+  Tipp: Du kannst das Bild oben auch lang gedr&uuml;ckt halten und so direkt &uuml;ber das System-Men&uuml; speichern.<br>
+  Direkt-Link zur SVG: <a href="walmdach_draufsicht.svg">walmdach_draufsicht.svg</a>
+</p>
+
+<script>
+async function render(format) {
+  const srcImg = document.getElementById('svgImg');
+  // Fetch SVG markup so we can rasterise it reliably on mobile
+  const resp = await fetch(srcImg.src);
+  const svgText = await resp.text();
+  const blob = new Blob([svgText], {type:'image/svg+xml;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+
+  const img = new Image();
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+    img.src = url;
+  });
+
+  const scale = 2;
+  const W = 820 * scale, H = 640 * scale;
+  const cv = document.getElementById('cv');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(img, 0, 0, W, H);
+  URL.revokeObjectURL(url);
+
+  const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+  const ext  = format === 'png' ? 'png' : 'jpg';
+  const dataUrl = cv.toDataURL(mime, 0.92);
+
+  const a = document.createElement('a');
+  a.download = 'walmdach_draufsicht.' + ext;
+  a.href = dataUrl;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+document.getElementById('dlJpg').addEventListener('click', () => render('jpg').catch(e => alert('Fehler: ' + e)));
+document.getElementById('dlPng').addEventListener('click', () => render('png').catch(e => alert('Fehler: ' + e)));
+</script>
+</body>
+</html>
