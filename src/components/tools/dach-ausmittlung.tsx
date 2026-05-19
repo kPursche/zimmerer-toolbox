@@ -458,7 +458,7 @@ export function DachausmittlungTool() {
               </ul>
             </div>
 
-            <div class="flex justify-between border-t pt-1">
+            <div className="flex justify-between border-t pt-1">
               <span>Dachflaeche (Naeherung)</span>
               <span className="font-mono">
                 {result.flaeche_m2.toFixed(2)} m²
