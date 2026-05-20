@@ -16,6 +16,7 @@ import {
   Calculator,
   Car,
   Columns2,
+  Home,
   type LucideIcon,
   Layers,
   Mic,
@@ -72,6 +73,21 @@ export const TOOLS: Tool[] = [
     icon: Columns2,
     status: "available",
     category: "Holz",
+  },
+  {
+    slug: "dachausmittlung",
+    name: "Dachausmittlung",
+    description:
+      "Grundriss mit dem Finger zeichnen, Kanten als Traufe/Walm/Giebel beschriften und First, Grate, Sparrenlängen in mm berechnen.",
+    icon: Home,
+    status: "available",
+    category: "Dach",
+    whatsNext: [
+      "L-/T-förmige Grundrisse mit Kehlen",
+      "Mehrere Projekte verwalten",
+      "Sparrenliste als PDF exportieren",
+      "3D-Vorschau des Skeletts",
+    ],
   },
   {
     slug: "plattenschmiegen",

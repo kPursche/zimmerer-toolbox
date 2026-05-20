@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 640" font-family="Arial, sans-serif">
+  <rect width="820" height="640" fill="#fafafa"/>
+  <text x="410" y="28" text-anchor="middle" font-size="20" font-weight="bold">Walmdach – Draufsicht (maßstabsgetreu, 50 px = 1,00 m)</text>
+  <text x="410" y="52" text-anchor="middle" font-size="13" fill="#333">Grundriss 12,00 × 8,00 m | Hauptdach 45° | Walm 55°</text>
+  <g transform="translate(110, 110)">
+    <g stroke="#dddddd" stroke-width="0.5">
+      <line x1="0" y1="0" x2="0" y2="400"/><line x1="50" y1="0" x2="50" y2="400"/>
+      <line x1="100" y1="0" x2="100" y2="400"/><line x1="150" y1="0" x2="150" y2="400"/>
+      <line x1="200" y1="0" x2="200" y2="400"/><line x1="250" y1="0" x2="250" y2="400"/>
+      <line x1="300" y1="0" x2="300" y2="400"/><line x1="350" y1="0" x2="350" y2="400"/>
+      <line x1="400" y1="0" x2="400" y2="400"/><line x1="450" y1="0" x2="450" y2="400"/>
+      <line x1="500" y1="0" x2="500" y2="400"/><line x1="550" y1="0" x2="550" y2="400"/>
+      <line x1="600" y1="0" x2="600" y2="400"/>
+      <line x1="0" y1="0" x2="600" y2="0"/><line x1="0" y1="50" x2="600" y2="50"/>
+      <line x1="0" y1="100" x2="600" y2="100"/><line x1="0" y1="150" x2="600" y2="150"/>
+      <line x1="0" y1="200" x2="600" y2="200"/><line x1="0" y1="250" x2="600" y2="250"/>
+      <line x1="0" y1="300" x2="600" y2="300"/><line x1="0" y1="350" x2="600" y2="350"/>
+      <line x1="0" y1="400" x2="600" y2="400"/>
+    </g>
+    <polygon points="0,0 600,0 460,200 140,200" fill="#f4d9a0" stroke="#222" stroke-width="1.5" opacity="0.85"/>
+    <polygon points="0,400 600,400 460,200 140,200" fill="#e6c376" stroke="#222" stroke-width="1.5" opacity="0.85"/>
+    <polygon points="0,0 0,400 140,200" fill="#c8a35a" stroke="#222" stroke-width="1.5" opacity="0.85"/>
+    <polygon points="600,0 600,400 460,200" fill="#c8a35a" stroke="#222" stroke-width="1.5" opacity="0.85"/>
+    <rect x="0" y="0" width="600" height="400" fill="none" stroke="#000" stroke-width="2.5"/>
+    <line x1="0" y1="0" x2="140" y2="200" stroke="#1565c0" stroke-width="2.5"/>
+    <line x1="600" y1="0" x2="460" y2="200" stroke="#1565c0" stroke-width="2.5"/>
+    <line x1="600" y1="400" x2="460" y2="200" stroke="#1565c0" stroke-width="2.5"/>
+    <line x1="0" y1="400" x2="140" y2="200" stroke="#1565c0" stroke-width="2.5"/>
+    <line x1="140" y1="200" x2="460" y2="200" stroke="#c62828" stroke-width="3.5"/>
+    <g stroke="#444" stroke-width="1" fill="#444">
+      <line x1="300" y1="170" x2="300" y2="30"/><polygon points="300,20 295,35 305,35"/>
+      <line x1="300" y1="230" x2="300" y2="370"/><polygon points="300,380 295,365 305,365"/>
+      <line x1="115" y1="200" x2="20" y2="200"/><polygon points="10,200 25,195 25,205"/>
+      <line x1="485" y1="200" x2="580" y2="200"/><polygon points="590,200 575,195 575,205"/>
+    </g>
+    <g fill="#000" font-size="13" font-weight="bold">
+      <circle cx="0" cy="0" r="3"/><text x="-14" y="-6">A</text>
+      <circle cx="600" cy="0" r="3"/><text x="606" y="-6">B</text>
+      <circle cx="600" cy="400" r="3"/><text x="606" y="418">C</text>
+      <circle cx="0" cy="400" r="3"/><text x="-14" y="418">D</text>
+      <circle cx="140" cy="200" r="3.5" fill="#c62828"/><text x="118" y="195" fill="#c62828">F1</text>
+      <circle cx="460" cy="200" r="3.5" fill="#c62828"/><text x="465" y="195" fill="#c62828">F2</text>
+    </g>
+    <g stroke="#000" stroke-width="0.7" fill="#000" font-size="12">
+      <line x1="0" y1="-45" x2="600" y2="-45"/>
+      <line x1="0" y1="-50" x2="0" y2="-40"/>
+      <line x1="600" y1="-50" x2="600" y2="-40"/>
+      <text x="300" y="-52" text-anchor="middle">12,00 m  (Gebäudelänge)</text>
+    </g>
+    <g stroke="#000" stroke-width="0.7" fill="#000" font-size="12">
+      <line x1="-55" y1="0" x2="-55" y2="400"/>
+      <line x1="-60" y1="0" x2="-50" y2="0"/>
+      <line x1="-60" y1="400" x2="-50" y2="400"/>
+      <text x="-65" y="205" text-anchor="middle" transform="rotate(-90,-65,205)">8,00 m  (Gebäudebreite)</text>
+    </g>
+    <g stroke="#c62828" stroke-width="0.7" fill="#c62828" font-size="12">
+      <line x1="140" y1="170" x2="460" y2="170"/>
+      <line x1="140" y1="165" x2="140" y2="175"/>
+      <line x1="460" y1="165" x2="460" y2="175"/>
+      <text x="300" y="162" text-anchor="middle" font-weight="bold">First L = 6,40 m</text>
+    </g>
+    <g stroke="#1565c0" stroke-width="0.7" fill="#1565c0" font-size="11">
+      <line x1="0" y1="240" x2="140" y2="240"/>
+      <line x1="0" y1="235" x2="0" y2="245"/>
+      <line x1="140" y1="235" x2="140" y2="245"/>
+      <text x="70" y="256" text-anchor="middle">d = 2,80 m</text>
+    </g>
+    <g stroke="#1565c0" stroke-width="0.7" fill="#1565c0" font-size="11">
+      <line x1="460" y1="240" x2="600" y2="240"/>
+      <line x1="460" y1="235" x2="460" y2="245"/>
+      <line x1="600" y1="235" x2="600" y2="245"/>
+      <text x="530" y="256" text-anchor="middle">d = 2,80 m</text>
+    </g>
+    <g fill="#1565c0" font-size="11" font-style="italic">
+      <path d="M 35,0 A 35,35 0 0 1 28.6,20.4" stroke="#1565c0" stroke-width="0.8" fill="none"/>
+      <text x="40" y="15">55°</text>
+      <path d="M 0,35 A 35,35 0 0 0 20.4,28.6" stroke="#1565c0" stroke-width="0.8" fill="none"/>
+      <text x="5" y="48">35°</text>
+    </g>
+    <text x="48" y="205" font-size="11" fill="#444" text-anchor="middle">Walm</text>
+    <text x="48" y="218" font-size="11" fill="#444" text-anchor="middle">55°</text>
+    <text x="552" y="205" font-size="11" fill="#444" text-anchor="middle">Walm</text>
+    <text x="552" y="218" font-size="11" fill="#444" text-anchor="middle">55°</text>
+    <text x="300" y="100" font-size="11" fill="#444" text-anchor="middle">Hauptdach 45°</text>
+    <text x="300" y="305" font-size="11" fill="#444" text-anchor="middle">Hauptdach 45°</text>
+  </g>
+  <g transform="translate(110, 560)" font-size="12">
+    <text x="0" y="0" font-weight="bold" font-size="13">Legende:</text>
+    <line x1="0" y1="20" x2="35" y2="20" stroke="#000" stroke-width="2.5"/>
+    <text x="42" y="24">Traufe / Dachkante</text>
+    <line x1="180" y1="20" x2="215" y2="20" stroke="#c62828" stroke-width="3.5"/>
+    <text x="222" y="24">First</text>
+    <line x1="280" y1="20" x2="315" y2="20" stroke="#1565c0" stroke-width="2.5"/>
+    <text x="322" y="24">Grat</text>
+    <line x1="380" y1="20" x2="410" y2="20" stroke="#444" stroke-width="1"/>
+    <polygon points="415,20 405,17 405,23" fill="#444"/>
+    <text x="422" y="24">Falllinie (Wasserlauf)</text>
+    <text x="0" y="50" font-weight="bold">Berechnete Größen:</text>
+    <text x="0" y="68">Firsthöhe h = (8/2)·tan 45° = 4,00 m</text>
+    <text x="0" y="84">Walmtiefe d = h / tan 55° = 2,80 m</text>
+    <text x="300" y="68">Firstlänge L = 12 - 2·d = 6,40 m</text>
+    <text x="300" y="84">Gratneigung im Raum ca. 39,3°</text>
+  </g>
+</svg>
