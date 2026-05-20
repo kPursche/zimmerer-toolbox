@@ -17,23 +17,29 @@ const fmt   = (v: number, dec = 1) => v.toFixed(dec);
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
 // Verschiebt den ersten Plattenstoss einer Reihe, damit der Mindestversatz
-// zur Fugenreihe darunter eingehalten wird. Probiert zuerst rückwärts (kürzen),
-// dann vorwärts (verlängern). prevOffset = Position des ersten Stosses der Vorreihe.
+// zur Fugenreihe darunter eingehalten wird.
+// prevOffset = Position des ersten Stosses der Vorreihe.
+// Nach jeder Verschiebung wird erneut geprüft (max. 3 Durchläufe), weil eine
+// Verschiebung die Fuge zu nah an eine andere Vorreihen-Fuge bringen kann.
 function applyMindestversatz(la: number, prevOffset: number, pb: number, mv: number): number {
   if (mv <= 0 || la <= 0) return la;
-  const d = ((la - prevOffset) % pb + pb) % pb;   // Abstand zur nächstliegenden Vorreihen-Fuge
-  if (d >= mv && pb - d >= mv) return la;          // bereits im gültigen Bereich
 
-  if (d < mv) {
-    // Fuge liegt d cm nach einer Vorreihen-Fuge — zu nah
-    const adjBack = la - d - mv;                   // rückwärts: Fuge mv cm vor die Vorreihen-Fuge
-    if (adjBack > 0) return adjBack;
-    return la + (mv - d);                          // vorwärts: Fuge mv cm nach der Vorreihen-Fuge
+  for (let i = 0; i < 3; i++) {
+    const d = ((la - prevOffset) % pb + pb) % pb; // Abstand zur nächstliegenden Vorreihen-Fuge
+    if (d >= mv && pb - d >= mv) return la;        // gültiger Bereich erreicht
+
+    if (d < mv) {
+      // Fuge liegt d cm rechts einer Vorreihen-Fuge — zu nah.
+      // Stoss um (d + mv) nach links verschieben; wenn das negativ wäre, pb addieren (Wrap).
+      const adjBack = la - d - mv;
+      la = adjBack > 0 ? adjBack : adjBack + pb;
+    } else {
+      // pb - d < mv: Fuge liegt (pb-d) cm vor der nächsten Vorreihen-Fuge — zu nah
+      const adjFwd = la + (pb - d) - mv;           // links: mv cm vor die nächste Vorreihen-Fuge
+      la = adjFwd > 0 ? adjFwd : la + (pb - d) + mv; // rechts: mv cm nach der nächsten Vorreihen-Fuge
+    }
   }
-  // pb - d < mv: Fuge liegt (pb-d) cm vor der nächsten Vorreihen-Fuge — zu nah
-  const adjFwd = la + (pb - d) - mv;              // vorwärts: mv cm vor die nächste Vorreihen-Fuge
-  if (adjFwd > 0) return adjFwd;
-  return la + (pb - d) + mv;                      // vorwärts: mv cm nach der nächsten Vorreihen-Fuge
+  return la;
 }
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
@@ -217,22 +223,22 @@ const p = useMemo(() => ({
         const sEnd = Math.min((coY + ph) / tanA, yF / tanA); // nie über B hinaus
         if (sEnd <= 0.1) break;
 
-        const laRaw: number = firstLen ?? pb;
-        if (firstLen !== null && laRaw <= 0) break;
+        const laRaw: number = (firstLen !== null && firstLen > 0) ? firstLen : pb;
 
-        const la: number = r === 0
-          ? laRaw
-          : applyMindestversatz(laRaw, prevJointOffset, pb, mv);
-
-        // Startposition: bei coY ≥ hvorne beginnt die Platte an der Gaubendachlinie
+        // xStart muss VOR der Mindestversatz-Prüfung stehen, da er sich ab coY ≥ hvorne
+        // ändert und die absolute Fugenposition bestimmt.
         const xStart = coY >= p.hvorne ? (coY - p.hvorne) / tanG : -uH;
+        const absRaw = xStart + laRaw;
+        const absAdj = r === 0 ? absRaw : applyMindestversatz(absRaw, prevJointOffset, pb, mv);
+        const la     = absAdj - xStart;
+
         let s: number = xStart + la;
         while (s < sEnd) s += pb;
         const abschnitt: number = s - sEnd;
 
         rowsW.push({ r, la, laRaw, abschnitt });
         coY             += ph;
-        prevJointOffset  = r === 0 ? 0 : la;
+        prevJointOffset  = r === 0 ? 0 : absAdj;
         firstLen         = abschnitt - 5;
       }
       return rowsW;
@@ -259,8 +265,7 @@ const p = useMemo(() => ({
       const sEnd = (p.hvorne - co / cosA) * cosG / sinAG;
       if (sEnd <= 0.1) break;
 
-      const laRaw: number = firstLen ?? pb;
-      if (firstLen !== null && laRaw <= 0) break;
+      const laRaw: number = (firstLen !== null && firstLen > 0) ? firstLen : pb;
 
       const la: number = r === 0
         ? laRaw
@@ -511,7 +516,7 @@ const p = useMemo(() => ({
                 mindestversatz={parseFloat(ep.mindestversatz) || 0}
                 verlegeart={ep.verlegeart}
               />
-              {ep.verlegeart === 'waagerecht' && plattenErg && plattenErg.length > 0 && (() => {
+              {plattenErg && plattenErg.length > 0 && (() => {
                 const ph0 = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
                 const phN = parseFloat(ep.platteHoehe) || 62.5;
                 const pbRow = parseFloat(ep.platteBreite) || 250;
@@ -521,12 +526,21 @@ const p = useMemo(() => ({
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-mu">
                       Zuschnittplan
                     </p>
-                    <AllePlattenSkizze
-                      pb={pbRow} ph0={ph0} phN={phN}
-                      alpha={p.alpha} gamma={p.gamma}
-                      hvorne={p.hvorne} ueberstand={uH}
-                      rows={plattenErg}
-                    />
+                    {ep.verlegeart === 'waagerecht' ? (
+                      <AllePlattenSkizze
+                        pb={pbRow} ph0={ph0} phN={phN}
+                        alpha={p.alpha} gamma={p.gamma}
+                        hvorne={p.hvorne} ueberstand={uH}
+                        rows={plattenErg}
+                      />
+                    ) : (
+                      <AllePlattenSkizzeSchraeg
+                        pb={pbRow} ph0={ph0} phN={phN}
+                        alpha={p.alpha} gamma={p.gamma}
+                        hvorne={p.hvorne} ueberstand={uH}
+                        rows={plattenErg}
+                      />
+                    )}
                   </div>
                 );
               })()}
@@ -535,16 +549,28 @@ const p = useMemo(() => ({
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-mu">
                     Schnittmaße — Abschnitt je Reihe
                   </p>
-                  {ep.verlegeart === 'waagerecht' && (() => {
+                  {(() => {
                     const ph = parseFloat(ep.platteHoehe) || 62.5;
-                    const vm = round1(ph / Math.tan(toRad(p.alpha)));
-                    return (
-                      <p className="text-[11px] text-mu">
-                        Verstichmass Hauptdach-Schmiege:{' '}
-                        <strong className="text-tx">{fmt(vm)} cm</strong>
-                        {' '}(= {ph} cm / tan {fmt(p.alpha)}°)
-                      </p>
-                    );
+                    if (ep.verlegeart === 'waagerecht') {
+                      const vm = round1(ph / Math.tan(toRad(p.alpha)));
+                      return (
+                        <p className="text-[11px] text-mu">
+                          Verstichmass Hauptdach-Schmiege:{' '}
+                          <strong className="text-tx">{fmt(vm)} cm</strong>
+                          {' '}(= {ph} cm / tan {fmt(p.alpha)}°)
+                        </p>
+                      );
+                    } else {
+                      const ag = p.alpha - p.gamma;
+                      const vm = round1(ph / Math.tan(toRad(ag)));
+                      return (
+                        <p className="text-[11px] text-mu">
+                          Verstichmass Gaubendach-Schmiege:{' '}
+                          <strong className="text-tx">{fmt(vm)} cm</strong>
+                          {' '}(= {ph} cm / tan {fmt(round1(ag))}°)
+                        </p>
+                      );
+                    }
                   })()}
                   <div className="space-y-1">
                     {plattenErg.map(({ r, la, laRaw, abschnitt }) => {
@@ -630,8 +656,7 @@ function GaubenwangeKonturSVG({
     const sEnd = (hvorne - co / cosA) * cosG / sinAG;
     if (sEnd <= 0.1) break;
 
-    const laRaw: number = firstLen ?? pb;
-    if (firstLen !== null && laRaw <= 0) break;
+    const laRaw: number = (firstLen !== null && firstLen > 0) ? firstLen : pb;
 
     const la: number = r === 0
       ? laRaw
@@ -669,13 +694,12 @@ function GaubenwangeKonturSVG({
       if (coYw >= yF) break;
       const sEnd  = Math.min((coYw + ph) / tanA, T); // nie über B hinaus
       if (sEnd <= 0.1) break;
-      const laRaw: number = firstLenW ?? pb;
-      if (firstLenW !== null && laRaw <= 0) break;
-      const la: number = r === 0
-        ? laRaw
-        : applyMindestversatz(laRaw, prevJointOffW, pb, mindestversatz);
-      // Startposition: bei coYw ≥ hvorne beginnt die Platte an der Gaubendachlinie
+      const laRaw: number = (firstLenW !== null && firstLenW > 0) ? firstLenW : pb;
+      // xStartW muss VOR der Mindestversatz-Prüfung stehen (absolute Fugenposition).
       const xStartW = coYw >= hvorne ? (coYw - hvorne) / tanG : -ueberstand;
+      const absRawW = xStartW + laRaw;
+      const absAdjW = r === 0 ? absRawW : applyMindestversatz(absRawW, prevJointOffW, pb, mindestversatz);
+      const la      = absAdjW - xStartW;
       const platesW: PlateW[] = [];
       if (r === 0) {
         let s = xStartW;
@@ -689,7 +713,7 @@ function GaubenwangeKonturSVG({
       const abschnittW = lastW.start + lastW.len - sEnd;
       allRowsW.push({ r, coY: coYw, ph, sEnd, plates: platesW, abschnitt: abschnittW });
       coYw             += ph;
-      prevJointOffW    = r === 0 ? 0 : la;
+      prevJointOffW    = r === 0 ? 0 : absAdjW;
       firstLenW        = abschnittW - 5;
     }
   }
@@ -916,27 +940,29 @@ function GaubenwangeKonturSVG({
         )}
         {allRowsW.map(({ r, coY, ph, sEnd }) => {
           const isUpper = coY >= hvorne;
+          // Endpunkt auf First (yF) clampen — letzte Reihe kann über yF hinausgehen
+          const yTop = Math.min(coY + ph, yF);
           // Rechte Schmiege (Hauptdach α)
           const xBotR = coY / tanA;
           const xTopR = sEnd;
           // Linke Schmiege (Gaubendach γ) — nur für obere Reihen
           const xBotL = isUpper ? (coY - hvorne) / tanG : null;
-          const xTopL = isUpper ? (coY + ph - hvorne) / tanG : null;
+          const xTopL = isUpper ? (yTop - hvorne) / tanG : null;
           return (
             <g key={`vm${r}`}>
               {/* Hauptdach-Schmiege rechts */}
-              <line x1={sx(xBotR)} y1={sy(coY)} x2={sx(xTopR)} y2={sy(coY + ph)}
+              <line x1={sx(xBotR)} y1={sy(coY)} x2={sx(xTopR)} y2={sy(yTop)}
                 stroke="#d47070" strokeWidth="1.2" strokeDasharray="4 2" />
-              <text x={sx((xBotR + xTopR) / 2) + 8} y={sy(coY + ph / 2)}
+              <text x={sx((xBotR + xTopR) / 2) + 8} y={sy((coY + yTop) / 2)}
                 fontSize="7.5" fill="#d47070" dominantBaseline="middle">
                 vα={fmt(round1(ph / tanA))} cm
               </text>
               {/* Gaubendach-Schmiege links (nur obere Reihen) */}
               {isUpper && xBotL !== null && xTopL !== null && (
                 <>
-                  <line x1={sx(xBotL)} y1={sy(coY)} x2={sx(xTopL)} y2={sy(coY + ph)}
+                  <line x1={sx(xBotL)} y1={sy(coY)} x2={sx(xTopL)} y2={sy(yTop)}
                     stroke="#6fa8d4" strokeWidth="1.2" strokeDasharray="4 2" />
-                  <text x={sx((xBotL + xTopL) / 2) - 8} y={sy(coY + ph / 2)}
+                  <text x={sx((xBotL + xTopL) / 2) - 8} y={sy((coY + yTop) / 2)}
                     fontSize="7.5" fill="#6fa8d4" textAnchor="end" dominantBaseline="middle">
                     vγ={fmt(round1(ph / tanG))} cm
                   </text>
@@ -995,6 +1021,186 @@ function HDimLine({ x1, x2, y, label, col, above }: {
   );
 }
 
+function EinzelplatteSVG({
+  platteW, platteH, cutTopY, alpha, gamma,
+  hasRightCut, rightCutLocalBot, rightCutLocalTop, rightCutEntryY, abschnitt,
+  hasLeftCut, leftCutLocalTop, leftCutEntryY, leftCutExitY,
+  rightCutExitRight = false,
+  alphaCutRightY,
+}: {
+  platteW: number; platteH: number; cutTopY: number; alpha: number; gamma: number;
+  hasRightCut: boolean; rightCutLocalBot: number; rightCutLocalTop: number; rightCutEntryY: number; abschnitt: number;
+  hasLeftCut: boolean; leftCutLocalTop: number; leftCutEntryY: number; leftCutExitY: number;
+  rightCutExitRight?: boolean;
+  alphaCutRightY?: number;
+}) {
+  const sc  = Math.min(100 / platteH, 240 / platteW);
+  const bW  = platteW * sc;
+  const bH  = platteH * sc;
+  const PAD_L = 8;
+  const PAD_R = 26;
+  const PAD_T = (hasRightCut || hasLeftCut) ? 36 : 14;
+  const PAD_B = 26;
+  const SVG_W = Math.round(bW + PAD_L + PAD_R);
+  const SVG_H = Math.round(bH + PAD_T + PAD_B);
+
+  const sx = (x: number) => PAD_L + x * sc;
+  const sy = (y: number) => PAD_T + (platteH - y) * sc;
+  const xL = sx(0), xR = sx(platteW);
+  const yB = sy(0), yT = sy(platteH);
+  // yCutT: row-level top reference (effPh) — used for γ-cuts and hasCutOff
+  const yCutT = sy(cutTopY);
+  // yCutA: where the α-cut terminates in SVG y
+  //   - top-exit: same as yCutT
+  //   - right-exit: height at the right edge (alphaCutRightY)
+  const yCutA = (rightCutExitRight && alphaCutRightY !== undefined) ? sy(alphaCutRightY) : yCutT;
+  const hasCutOff = !rightCutExitRight && cutTopY < platteH - 0.1;
+
+  const showLC = hasLeftCut && leftCutLocalTop > 0.3;
+  const botR   = hasRightCut ? sx(rightCutLocalBot) : xR;
+  // For right-exit: α exits at the right edge regardless of rightCutLocalTop
+  const topR   = hasRightCut ? (rightCutExitRight ? xR : sx(rightCutLocalTop)) : xR;
+  const topL   = showLC ? sx(leftCutLocalTop) : xL;
+  // SVG y-coords for γ-cut entry (left edge) and exit (top or right edge)
+  const entL   = showLC ? sy(leftCutEntryY) : yB;
+  const exitL  = showLC ? sy(leftCutExitY)  : yCutT;
+  // γ-cut exits through the right edge when leftCutLocalTop == platteW
+  const lcExR  = showLC && leftCutLocalTop >= platteW - 0.01;
+  // α-cut enters from the left edge (not bottom) when rightCutLocalBot ≈ 0 but rightCutEntryY > 0
+  const lcEntersLeft = hasRightCut && rightCutLocalBot < 0.01 && rightCutEntryY > 0.01;
+  // SVG y-coord where α-cut enters the left edge (only meaningful when lcEntersLeft)
+  const entA = lcEntersLeft ? sy(rightCutEntryY) : yB;
+
+  // usedPts: usable material zone.
+  //
+  // rightCutExitRight=true (α exits right edge at yCutA):
+  //   If γ also exits right (lcExR): usable zone is a quadrilateral bounded on the upper-right
+  //   by the γ-exit — the top above that belongs to γ-waste (lwPts).
+  //   Otherwise: full plate top is usable above the α-exit.
+  //
+  // rightCutExitRight=false: original logic unchanged.
+  const usedPts = rightCutExitRight
+    ? lcEntersLeft
+      ? lcExR
+        ? `${xL},${entA} ${xR},${yCutA} ${xR},${exitL}`
+        : `${xL},${entA} ${xR},${yCutA} ${xR},${yT} ${xL},${yT}`
+      : lcExR
+        ? `${xL},${yB} ${botR},${yB} ${xR},${yCutA} ${xR},${exitL}`
+        : `${xL},${yB} ${botR},${yB} ${xR},${yCutA} ${xR},${yT} ${xL},${yT}`
+    : showLC
+      ? lcExR
+        ? `${xL},${yB} ${xR},${yB} ${xR},${exitL} ${xL},${entL}`
+        : lcEntersLeft
+          ? `${xL},${entA} ${xL},${entL} ${topL},${yCutT} ${topR},${yCutT}`
+          : `${xL},${yB} ${botR},${yB} ${topR},${yCutT} ${topL},${yCutT} ${xL},${entL}`
+      : lcEntersLeft
+        ? `${xL},${entA} ${topR},${yCutT} ${xL},${yCutT}`
+        : `${xL},${yB} ${botR},${yB} ${topR},${yCutT} ${topL},${yCutT}`;
+  // absPts: α-waste zone (to the right of the α-cut).
+  const absPts = hasRightCut
+    ? rightCutExitRight
+      ? lcEntersLeft
+        ? `${xL},${yB} ${xR},${yB} ${xR},${yCutA} ${xL},${entA}`
+        : `${botR},${yB} ${xR},${yB} ${xR},${yCutA}`
+      : lcEntersLeft
+        ? `${xL},${yB} ${xR},${yB} ${xR},${yCutT} ${topR},${yCutT} ${xL},${entA}`
+        : `${botR},${yB} ${xR},${yB} ${xR},${yCutT} ${topR},${yCutT}`
+    : '';
+  // Waste polygon for γ-cut
+  // lcExR=false: triangle entL→topL→TL
+  // lcExR=true:  quad    entL→exitL(right)→TR→TL
+  const lwPts = showLC
+    ? lcExR
+      ? `${xL},${entL} ${xR},${exitL} ${xR},${yT} ${xL},${yT}`
+      : `${xL},${entL} ${topL},${yCutT} ${xL},${yCutT}`
+    : '';
+
+  const dimY = yT - 10;
+
+  return (
+    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: SVG_W, height: SVG_H }}
+      overflow="visible">
+
+      <polygon points={usedPts}
+        fill="#6fa8d4" fillOpacity="0.2" stroke="#6fa8d4" strokeWidth="1.2" />
+
+      {hasRightCut && (
+        <polygon points={absPts}
+          fill="#c9924a" fillOpacity="0.15" stroke="#c9924a"
+          strokeWidth="1" strokeDasharray="4 2" />
+      )}
+
+      {lwPts && (
+        <polygon points={lwPts}
+          fill="#888" fillOpacity="0.1" stroke="#6fa8d4"
+          strokeWidth="1" strokeDasharray="4 2" />
+      )}
+
+      {/* Top-waste zone when ridge falls within the plate (last row) */}
+      {hasCutOff && (
+        <rect x={xL} y={yT} width={bW} height={yCutT - yT}
+          fill="#aaa" fillOpacity="0.08" />
+      )}
+      {hasCutOff && (
+        <line x1={xL} y1={yCutT} x2={xR} y2={yCutT}
+          stroke="#888" strokeWidth="1" strokeDasharray="4 2" />
+      )}
+
+      {hasRightCut && (
+        <line x1={lcEntersLeft ? xL : botR} y1={lcEntersLeft ? entA : yB}
+          x2={topR} y2={yCutA}
+          stroke="#d47070" strokeWidth="1.5" strokeDasharray="5 2" />
+      )}
+
+      {showLC && (
+        <line x1={xL} y1={entL}
+          x2={lcExR ? xR : topL}
+          y2={lcExR ? exitL : yCutT}
+          stroke="#6fa8d4" strokeWidth="1.5" strokeDasharray="5 2" />
+      )}
+
+      {/* vα dimension: only for top-exit (right-exit has no meaningful vα strip) */}
+      {hasRightCut && !rightCutExitRight && (
+        <HDimLine x1={botR} x2={topR} y={dimY}
+          label={`vα ${fmt(round1(rightCutLocalTop - rightCutLocalBot))} cm`}
+          col="#d47070" above={true} />
+      )}
+
+      {hasRightCut && abschnitt > 0.3 && (
+        <HDimLine x1={topR} x2={xR} y={dimY}
+          label={`${fmt(round1(abschnitt))} cm`}
+          col="#c9924a" above={true} />
+      )}
+
+      {showLC && (
+        <HDimLine x1={xL} x2={topL} y={dimY}
+          label={`vγ ${fmt(round1(leftCutLocalTop))} cm`}
+          col="#6fa8d4" above={true} />
+      )}
+
+      <HDimLine x1={xL} x2={xR} y={yB + 16}
+        label={`${fmt(platteW)} cm`} col="#888" above={false} />
+
+      <line x1={xR + 8} y1={yB} x2={xR + 8} y2={yT} stroke="#aaa" strokeWidth="0.8" />
+      <line x1={xR + 5} y1={yB} x2={xR + 11} y2={yB} stroke="#aaa" strokeWidth="0.8" />
+      <line x1={xR + 5} y1={yT} x2={xR + 11} y2={yT} stroke="#aaa" strokeWidth="0.8" />
+      <text x={xR + 14} y={(yB + yT) / 2} fontSize="7.5" fill="#888"
+        dominantBaseline="middle" fontWeight="600">{fmt(platteH)} cm</text>
+
+      {hasRightCut && (
+        <text x={topR + 3} y={yT + 11} fontSize="7" fill="#d47070" fontWeight="600">
+          α={alpha}°
+        </text>
+      )}
+      {showLC && (
+        <text x={topL + 2} y={yT + 11} fontSize="7" fill="#6fa8d4" fontWeight="600">
+          γ={gamma}°
+        </text>
+      )}
+    </svg>
+  );
+}
+
 function AllePlattenSkizze({ pb, ph0, phN, alpha, gamma, hvorne, ueberstand, rows }: {
   pb: number; ph0: number; phN: number;
   alpha: number; gamma: number; hvorne: number; ueberstand: number;
@@ -1003,12 +1209,13 @@ function AllePlattenSkizze({ pb, ph0, phN, alpha, gamma, hvorne, ueberstand, row
   const tanA = Math.tan(toRad(alpha));
   const tanG = Math.tan(toRad(gamma));
   const T    = hvorne / (tanA - tanG);
+  const yF   = T * tanA;
 
   type RD = {
     r: number; ph: number; coY: number;
     plates: { dispX: number; w: number }[];
     cutBotDX: number; cutTopDX: number;
-    abschnitt: number; isUpper: boolean; vG: number;
+    abschnitt: number; isUpper: boolean;
   };
 
   const rds: RD[] = [];
@@ -1025,107 +1232,376 @@ function AllePlattenSkizze({ pb, ph0, phN, alpha, gamma, hvorne, ueberstand, row
     let dX = r === 0 ? pb : la;
     while (dX < cTopDX + 0.1) { plates.push({ dispX: dX, w: pb }); dX += pb; }
 
-    rds.push({ r, ph, coY, plates, cutBotDX: cBotDX, cutTopDX: cTopDX, abschnitt, isUpper: coY >= hvorne, vG: ph / tanG });
+    // A row is "upper" if any part of it is above the dormer line (coY+ph > hvorne).
+    // This includes the straddle row where coY < hvorne < coY+ph.
+    rds.push({ r, ph, coY, plates, cutBotDX: cBotDX, cutTopDX: cTopDX, abschnitt, isUpper: coY + ph > hvorne });
     coY += ph;
   }
 
-  const totalPh = coY;
-  const maxDW   = Math.max(...rds.map(rd => { const l = rd.plates[rd.plates.length - 1]; return l.dispX + l.w; }));
-
-  const PAD_L = 46; const PAD_R = 22; const PAD_T = 28; const PAD_B = 42;
-  const sc    = Math.min((480 - PAD_L - PAD_R) / maxDW, (440 - PAD_T - PAD_B) / totalPh, 2.2);
-  const SVG_W = Math.round(maxDW * sc + PAD_L + PAD_R);
-  const SVG_H = Math.round(totalPh * sc + PAD_T + PAD_B);
-
-  const sx  = (x: number) => PAD_L + x * sc;
-  const syB = (y: number) => PAD_T + (totalPh - y) * sc;
-  const syT = (y: number, h: number) => PAD_T + (totalPh - y - h) * sc;
-
   return (
-    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full overflow-visible"
-      aria-label="Zuschnittplan alle Reihen und Platten">
-
-      {rds.map(({ r, ph, coY, plates, cutBotDX, cutTopDX, abschnitt, isUpper, vG }) => {
-        const yB  = syB(coY);
-        const yT  = syT(coY, ph);
-        const col = r % 2 === 0 ? '#6fa8d4' : '#7fb87a';
-
+    <div className="space-y-5">
+      {rds.map(({ r, ph, coY: rowCoY, plates, cutBotDX, cutTopDX, isUpper, abschnitt }) => {
+        // For the last row the ridge (Gaubenpunkt B) falls within the plate height.
+        // Use the effective height up to the ridge so both cuts converge correctly.
+        const effPh = Math.min(ph, yF - rowCoY);
+        // For the straddle row (coY < hvorne < coY+ph) the γ-cut only starts at the
+        // height where the plate crosses the dormer line. yEntryRow is 0 for fully
+        // upper rows, and (hvorne - coY) for the straddle row.
+        const yEntryRow = Math.max(0, hvorne - rowCoY);
+        const vGeff = (effPh - yEntryRow) / tanG;
         return (
-          <g key={r}>
+        <div key={r} className="space-y-2">
+          <p className="text-[11px] font-semibold text-mu">Reihe {r + 1}</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-4">
             {plates.map(({ dispX, w }, i) => {
               const isLast = i === plates.length - 1;
-              const xL = sx(dispX);
-              if (isLast) {
-                const cBotX = sx(Math.max(dispX, cutBotDX));
-                const cTopX = sx(cutTopDX);
-                return (
-                  <g key={i}>
-                    <polygon points={`${xL},${yB} ${cBotX},${yB} ${cTopX},${yT} ${xL},${yT}`}
-                      fill={col} fillOpacity="0.22" stroke={col} strokeWidth="1.1" />
-                    <polygon points={`${cBotX},${yB} ${sx(dispX + w)},${yB} ${sx(dispX + w)},${yT} ${cTopX},${yT}`}
-                      fill="#c9924a" fillOpacity="0.15" stroke="#c9924a" strokeWidth="1.1" strokeDasharray="4 2" />
-                    <line x1={cBotX} y1={yB} x2={cTopX} y2={yT}
-                      stroke="#d47070" strokeWidth="1.6" strokeDasharray="5 2" />
-                    {abschnitt > 3 && (
-                      <text x={(cTopX + sx(dispX + w)) / 2} y={(yT + yB) / 2}
-                        fontSize="7.5" fill="#c9924a" textAnchor="middle" dominantBaseline="middle" fontWeight="700">
-                        {fmt(round1(abschnitt))} cm
-                      </text>
-                    )}
-                  </g>
-                );
-              }
+
+              // α-cut touches this plate when its x-range overlaps the plate's x-range.
+              const hasRightCut = cutBotDX < dispX + w - 0.01 && cutTopDX > dispX + 0.01;
+              // Non-last plates: cut exits through the right edge (not the top).
+              const rightCutExitRight = hasRightCut && !isLast;
+
+              // Local x where cut enters from the bottom (0 when it enters from the left edge).
+              const rightCutLocalBot = hasRightCut ? Math.max(0, cutBotDX - dispX) : 0;
+              // Exit x: top of the plate for last plate, right edge (w) for intermediate.
+              const rightCutLocalTop = hasRightCut
+                ? (isLast ? Math.max(0, cutTopDX - dispX) : w)
+                : 0;
+              // When the cut's bottom is left of this plate it enters from the left edge.
+              const rightCutEntryY = hasRightCut && cutBotDX < dispX - 0.01
+                ? Math.max(0, (dispX - cutBotDX) * tanA)
+                : 0;
+
+              // cutTopY: for last plate = effPh (exits top); for intermediate = height at right edge.
+              const plateCutTopY = (!hasRightCut || isLast)
+                ? effPh
+                : Math.min(rightCutEntryY + (w - rightCutLocalBot) * tanA, ph);
+
+              // γ-cut: applies when row is upper and cut hasn't passed this plate yet.
+              const lcRaw       = isUpper ? vGeff - dispX : -1;
+              const hasLeftCut  = lcRaw > 0 && (!isLast || lcRaw <= rightCutLocalTop + 0.01);
+              const leftCutLocalTop = hasLeftCut ? Math.min(lcRaw, w) : 0;
+              const leftCutEntryY   = hasLeftCut ? yEntryRow + dispX * tanG : 0;
+              const leftCutExitY    = hasLeftCut
+                ? (leftCutLocalTop < w - 0.01 ? effPh : yEntryRow + (dispX + w) * tanG)
+                : effPh;
+              const plateAbschnitt = isLast ? abschnitt : 0;
               return (
-                <rect key={i} x={xL} y={yT} width={w * sc} height={yB - yT}
-                  fill={col} fillOpacity={i % 2 === 0 ? 0.20 : 0.12} stroke={col} strokeWidth="1.1" />
+                <div key={i} className="space-y-1">
+                  <p className="text-[9px] font-semibold text-dm">Platte {i + 1}</p>
+                  <EinzelplatteSVG
+                    platteW={w} platteH={ph} cutTopY={effPh}
+                    alpha={alpha} gamma={gamma}
+                    hasRightCut={hasRightCut}
+                    rightCutLocalBot={rightCutLocalBot}
+                    rightCutLocalTop={rightCutLocalTop}
+                    rightCutEntryY={rightCutEntryY}
+                    abschnitt={plateAbschnitt}
+                    hasLeftCut={hasLeftCut}
+                    leftCutLocalTop={leftCutLocalTop}
+                    leftCutEntryY={leftCutEntryY}
+                    leftCutExitY={leftCutExitY}
+                    rightCutExitRight={rightCutExitRight}
+                    alphaCutRightY={rightCutExitRight ? plateCutTopY : undefined}
+                  />
+                </div>
               );
             })}
-
-            {/* Gaubendach-Schmiege (obere Reihen) */}
-            {isUpper && (
-              <line x1={sx(0)} y1={yB} x2={sx(Math.min(vG, cutTopDX))} y2={yT}
-                stroke="#6fa8d4" strokeWidth="1.5" strokeDasharray="5 2" />
-            )}
-
-            {/* Erstes Stück — Länge wenn < pb */}
-            {r > 0 && plates[0].w < pb * 0.98 && (
-              <text x={sx(plates[0].w / 2)} y={(yT + yB) / 2}
-                fontSize="7.5" fill={col} textAnchor="middle" dominantBaseline="middle" fontWeight="700">
-                {fmt(round1(plates[0].w))} cm
-              </text>
-            )}
-
-            <text x={PAD_L - 5} y={(yT + yB) / 2}
-              fontSize="9" fill={col} textAnchor="end" dominantBaseline="middle" fontWeight="700">
-              R{r + 1}
-            </text>
-            <line x1={PAD_L} y1={yT} x2={SVG_W - PAD_R} y2={yT} stroke="#ccc" strokeWidth="0.5" />
-          </g>
+          </div>
+        </div>
         );
       })}
+    </div>
+  );
+}
 
-      <line x1={PAD_L} y1={syB(0)} x2={SVG_W - PAD_R} y2={syB(0)} stroke="#ccc" strokeWidth="0.5" />
+// ─── Schräg-Zuschnittplan ─────────────────────────────────────────────────────
 
-      {/* Plattenbreite-Referenzlinie */}
-      <line x1={sx(0)} y1={syB(0)} x2={sx(0)} y2={syB(0) + 18} stroke="#bbb" strokeWidth="0.6" strokeDasharray="2 2" />
-      <line x1={sx(pb)} y1={syB(0)} x2={sx(pb)} y2={syB(0) + 18} stroke="#bbb" strokeWidth="0.6" strokeDasharray="2 2" />
-      <HDimLine x1={sx(0)} x2={sx(pb)} y={syB(0) + 20}
-        label={`pb = ${fmt(pb)} cm`} col="#888" above={false} />
+function EinzelplatteSVGSchraeg({
+  platteW, platteH,
+  hasCut, cutBotLocal, cutTopLocal,
+  hasVkCut, vkBotLocal, vkTopLocal,
+  abschnitt, gamma, tanAlpha, rowColor,
+}: {
+  platteW: number; platteH: number;
+  hasCut: boolean; cutBotLocal: number; cutTopLocal: number;
+  hasVkCut: boolean; vkBotLocal: number; vkTopLocal: number;
+  abschnitt: number; gamma: number; tanAlpha: number; rowColor: string;
+}) {
+  const sc  = Math.min(100 / platteH, 240 / platteW);
+  const bW  = platteW * sc;
+  const bH  = platteH * sc;
+  const PAD_L = 8; const PAD_R = 26;
+  const anyDim = hasCut || hasVkCut;
+  const PAD_T = anyDim ? 36 : 14; const PAD_B = 26;
+  const SVG_W = Math.round(bW + PAD_L + PAD_R);
+  const SVG_H = Math.round(bH + PAD_T + PAD_B);
 
-      {/* Winkelbezeichnung */}
-      {rds.length > 0 && (
-        <text x={sx(rds[rds.length - 1].cutTopDX) + 3}
-          y={syT(rds[rds.length - 1].coY, rds[rds.length - 1].ph) - 4}
-          fontSize="7.5" fill="#d47070" fontWeight="600">α={fmt(alpha)}°</text>
+  const sx = (x: number) => PAD_L + x * sc;
+  const sy = (y: number) => PAD_T + (platteH - y) * sc;
+  const xL = sx(0), xR = sx(platteW);
+  const yB = sy(0), yT = sy(platteH);
+
+  // ── Gaubendach cut (right side, left-leaning) ────────────────────────────────
+  // Goes from (cutBotLocal, 0) → (cutTopLocal, platteH). cutTopLocal < cutBotLocal.
+  const verstichmass = cutBotLocal - cutTopLocal;
+  const botEntersBottom = hasCut && cutBotLocal >= 0 && cutBotLocal <= platteW;
+  const botEntersRight  = hasCut && cutBotLocal > platteW;
+  const topExitsTop     = hasCut && cutTopLocal >= 0 && cutTopLocal <= platteW;
+  const topExitsLeft    = hasCut && cutTopLocal < 0;
+  const rightEntryH = (botEntersRight && verstichmass > 0)
+    ? platteH * (cutBotLocal - platteW) / verstichmass : 0;
+  const leftExitH   = (topExitsLeft && verstichmass > 0)
+    ? platteH * cutBotLocal / verstichmass : 0;
+  const entX = botEntersBottom ? sx(cutBotLocal) : xR;
+  const entY = botEntersBottom ? yB : sy(rightEntryH);
+  const exX  = topExitsTop ? sx(cutTopLocal) : xL;
+  const exY  = topExitsTop ? yT : sy(leftExitH);
+
+  // ── Vorderkante cut (left side, right-leaning) ───────────────────────────────
+  // World-x formula from ecken(): x_world = (start + x_local)·cosA − y_local·sinA
+  // Setting x_world=0: x_local = y_local·tanA − start
+  // → at y=0:  vkBotLocal = -start   (plate-local x where VK hits bottom)
+  // → at y=ph: vkTopLocal = ph·tanA − start
+  // No co term — the perpendicular row offset doesn't affect x_world.
+  //
+  // Cases based on entry and exit edges:
+  //   A: enters bottom (vkBotLocal ≥ 0), exits top  (vkTopLocal ≤ len)
+  //   B: enters bottom (vkBotLocal ≥ 0), exits right (vkTopLocal > len)
+  //   C: enters left   (vkBotLocal < 0), exits top  (vkTopLocal ≤ len)
+  //   D: enters left   (vkBotLocal < 0), exits right (vkTopLocal > len)
+
+  const vkEntersBottom = hasVkCut && vkBotLocal >= -0.01;
+  const vkEntersLeft   = hasVkCut && vkBotLocal < -0.01;
+  const vkExitsTop     = hasVkCut && vkTopLocal <= platteW + 0.01;
+  const vkExitsRight   = hasVkCut && vkTopLocal > platteW + 0.01;
+
+  // Height where VK enters left edge: x_local=0 → y_local = start/tanA = -vkBotLocal/tanA
+  const vkLeftEntryH = (vkEntersLeft && tanAlpha > 0) ? (-vkBotLocal / tanAlpha) : 0;
+  // Height where VK exits right edge: x_local=len → y_local = (len-vkBotLocal)/tanA
+  const vkRightExitH = (vkExitsRight && tanAlpha > 0) ? ((platteW - vkBotLocal) / tanAlpha) : platteH;
+
+  const vkEntX = vkEntersBottom ? sx(Math.max(0, vkBotLocal)) : xL;
+  const vkEntY = vkEntersBottom ? yB : sy(vkLeftEntryH);
+  const vkExX  = vkExitsTop ? sx(Math.min(vkTopLocal, platteW)) : xR;
+  const vkExY  = vkExitsTop ? yT : sy(vkRightExitH);
+
+  // Vorderkante waste polygon (left of cut)
+  let vkWastePts = '';
+  if (hasVkCut) {
+    if (vkEntersBottom && vkExitsTop) {
+      // Case A: trapezoid (or triangle when vkBotLocal=0)
+      vkWastePts = `${xL},${yB} ${vkEntX},${yB} ${vkExX},${yT} ${xL},${yT}`;
+    } else if (vkEntersBottom && vkExitsRight) {
+      // Case B: pentagon
+      vkWastePts = `${xL},${yB} ${vkEntX},${yB} ${xR},${vkExY} ${xR},${yT} ${xL},${yT}`;
+    } else if (vkEntersLeft && vkExitsTop) {
+      // Case C: triangle
+      vkWastePts = `${xL},${vkEntY} ${vkExX},${yT} ${xL},${yT}`;
+    } else {
+      // Case D: quad
+      vkWastePts = `${xL},${vkEntY} ${xR},${vkExY} ${xR},${yT} ${xL},${yT}`;
+    }
+  }
+
+  // ── Gaubendach waste polygon (right of cut) ──────────────────────────────────
+  let wastePts = '';
+  if (hasCut) {
+    if (botEntersBottom && topExitsTop) {
+      wastePts = `${entX},${yB} ${xR},${yB} ${xR},${yT} ${exX},${yT}`;
+    } else if (botEntersBottom && topExitsLeft) {
+      wastePts = `${entX},${yB} ${xR},${yB} ${xR},${yT} ${xL},${yT} ${xL},${exY}`;
+    } else if (botEntersRight && topExitsTop) {
+      wastePts = `${entX},${entY} ${xR},${yT} ${exX},${yT}`;
+    } else {
+      wastePts = `${entX},${entY} ${xR},${yT} ${xL},${yT} ${xL},${exY}`;
+    }
+  }
+
+  // ── Usable zone polygon ──────────────────────────────────────────────────────
+  let usedPts: string;
+  if (!hasCut && !hasVkCut) {
+    usedPts = `${xL},${yB} ${xR},${yB} ${xR},${yT} ${xL},${yT}`;
+  } else if (!hasCut) {
+    // Only VK cut
+    if (vkEntersBottom && vkExitsTop)   usedPts = `${vkEntX},${yB} ${xR},${yB} ${xR},${yT} ${vkExX},${yT}`;
+    else if (vkEntersBottom)             usedPts = `${vkEntX},${yB} ${xR},${yB} ${xR},${vkExY}`;  // Case B triangle
+    else if (vkEntersLeft && vkExitsTop) usedPts = `${xL},${yB} ${xR},${yB} ${xR},${yT} ${vkExX},${yT} ${xL},${vkEntY}`;
+    else                                 usedPts = `${xL},${yB} ${xR},${yB} ${xR},${vkExY} ${xL},${vkEntY}`; // Case D
+  } else if (!hasVkCut) {
+    // Only Gaubendach cut
+    if (botEntersBottom && topExitsTop)   usedPts = `${xL},${yB} ${entX},${yB} ${exX},${yT} ${xL},${yT}`;
+    else if (botEntersBottom && topExitsLeft) usedPts = `${xL},${yB} ${entX},${yB} ${xL},${exY}`;
+    else if (botEntersRight && topExitsTop)   usedPts = `${xL},${yB} ${xR},${yB} ${entX},${entY} ${exX},${yT} ${xL},${yT}`;
+    else                                      usedPts = `${xL},${yB} ${xR},${yB} ${entX},${entY} ${xL},${exY}`;
+  } else {
+    // Both cuts — handle most common combinations; fallback to full-rect outline
+    if (vkEntersBottom && vkExitsTop && botEntersBottom && topExitsTop) {
+      usedPts = `${vkEntX},${yB} ${entX},${yB} ${exX},${yT} ${vkExX},${yT}`;
+    } else if (vkEntersBottom && vkExitsRight && botEntersBottom && topExitsTop) {
+      usedPts = `${vkEntX},${yB} ${entX},${yB} ${exX},${yT} ${xR},${yT} ${xR},${vkExY}`;
+    } else if (vkEntersLeft && vkExitsTop && botEntersBottom && topExitsTop) {
+      usedPts = `${xL},${yB} ${entX},${yB} ${exX},${yT} ${vkExX},${yT} ${xL},${vkEntY}`;
+    } else if (vkEntersLeft && vkExitsTop && botEntersBottom && topExitsLeft) {
+      // Gaubendach cuts left edge entirely → small triangle in lower-left.
+      // VK waste is in the Gaubendach waste zone (above exY on left edge).
+      usedPts = `${xL},${yB} ${entX},${yB} ${xL},${exY}`;
+    } else {
+      // Generic fallback: draw VK-bounded left, full right
+      usedPts = `${vkEntX},${yB} ${xR},${yB} ${xR},${yT} ${vkExX},${yT}`;
+    }
+  }
+
+  const dimY = yT - 10;
+
+  return (
+    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: SVG_W, height: SVG_H }} overflow="visible">
+      <polygon points={usedPts}
+        fill={rowColor} fillOpacity="0.2" stroke={rowColor} strokeWidth="1.2" />
+      {hasVkCut && vkWastePts && (
+        <polygon points={vkWastePts}
+          fill="#d47070" fillOpacity="0.15" stroke="#d47070"
+          strokeWidth="1" strokeDasharray="4 2" />
       )}
-      {rds.some(rd => rd.isUpper) && (() => {
-        const fu = rds.find(rd => rd.isUpper);
-        return fu ? (
-          <text x={sx(0) - 4} y={syT(fu.coY, fu.ph) - 4}
-            fontSize="7.5" fill="#6fa8d4" fontWeight="600" textAnchor="end">γ={fmt(gamma)}°</text>
-        ) : null;
-      })()}
+      {hasCut && wastePts && (
+        <polygon points={wastePts}
+          fill="#c9924a" fillOpacity="0.15" stroke="#c9924a"
+          strokeWidth="1" strokeDasharray="4 2" />
+      )}
+      {/* Vorderkante cut line (red, right-leaning) */}
+      {hasVkCut && (
+        <line x1={vkEntX} y1={vkEntY} x2={vkExX} y2={vkExY}
+          stroke="#d47070" strokeWidth="1.5" strokeDasharray="5 2" />
+      )}
+      {/* Gaubendach cut line (blue, left-leaning) */}
+      {hasCut && (
+        <line x1={entX} y1={entY} x2={exX} y2={exY}
+          stroke="#6fa8d4" strokeWidth="1.5" strokeDasharray="5 2" />
+      )}
+      {/* Anschnitt links: bottom waste when entering from bottom */}
+      {hasVkCut && vkEntersBottom && vkBotLocal > 0.3 && (
+        <HDimLine x1={xL} x2={vkEntX} y={dimY}
+          label={`vα ${fmt(round1(vkBotLocal))} cm`}
+          col="#d47070" above={true} />
+      )}
+      {/* Anschnitt links: top exit width when entering from left edge */}
+      {hasVkCut && vkEntersLeft && vkExitsTop && vkTopLocal > 0.3 && (
+        <HDimLine x1={xL} x2={vkExX} y={dimY}
+          label={`vα ${fmt(round1(Math.min(vkTopLocal, platteW)))} cm`}
+          col="#d47070" above={true} />
+      )}
+      {/* vγ dimension */}
+      {hasCut && botEntersBottom && topExitsTop && (
+        <HDimLine x1={exX} x2={entX} y={dimY}
+          label={`vγ ${fmt(round1(verstichmass))} cm`}
+          col="#6fa8d4" above={true} />
+      )}
+      {/* Abschnitt (right waste, last plate only) */}
+      {hasCut && abschnitt > 0.3 && botEntersBottom && (
+        <HDimLine x1={entX} x2={xR} y={dimY}
+          label={`${fmt(round1(abschnitt))} cm`}
+          col="#c9924a" above={true} />
+      )}
+      <HDimLine x1={xL} x2={xR} y={yB + 16}
+        label={`${fmt(platteW)} cm`} col="#888" above={false} />
+      <line x1={xR + 8} y1={yB} x2={xR + 8} y2={yT} stroke="#aaa" strokeWidth="0.8" />
+      <line x1={xR + 5} y1={yB} x2={xR + 11} y2={yB} stroke="#aaa" strokeWidth="0.8" />
+      <line x1={xR + 5} y1={yT} x2={xR + 11} y2={yT} stroke="#aaa" strokeWidth="0.8" />
+      <text x={xR + 14} y={(yB + yT) / 2} fontSize="7.5" fill="#888"
+        dominantBaseline="middle" fontWeight="600">{fmt(platteH)} cm</text>
+      {hasVkCut && (
+        <text x={vkEntX + 2} y={yT + 11} fontSize="7" fill="#d47070" fontWeight="600">
+          α
+        </text>
+      )}
+      {hasCut && (
+        <text x={exX + 2} y={yT + 11} fontSize="7" fill="#6fa8d4" fontWeight="600">
+          γ={gamma}°
+        </text>
+      )}
     </svg>
+  );
+}
+
+function AllePlattenSkizzeSchraeg({ pb, ph0, phN, alpha, gamma, ueberstand, hvorne, rows }: {
+  pb: number; ph0: number; phN: number;
+  alpha: number; gamma: number; ueberstand: number; hvorne: number;
+  rows: Array<{ r: number; la: number; abschnitt: number }>;
+}) {
+  const cosA  = Math.cos(toRad(alpha));
+  const tanA  = Math.tan(toRad(alpha));
+  const cosG  = Math.cos(toRad(gamma));
+  const sinAG = Math.sin(toRad(alpha - gamma));
+  const cosAG = Math.cos(toRad(alpha - gamma));
+  const uSlope = ueberstand / cosA;
+
+  let co = 0;
+  const rds = rows.map(({ r, la, abschnitt }) => {
+    const ph  = r === 0 ? ph0 : phN;
+    const sEnd = (hvorne - co / cosA) * cosG / sinAG;
+    const verstichmassG = ph * cosAG / sinAG;
+
+    const plates: { start: number; len: number }[] = [];
+    if (r === 0) {
+      let s = -uSlope;
+      while (s < sEnd) { plates.push({ start: s, len: pb }); s += pb; }
+    } else {
+      plates.push({ start: -uSlope, len: la });
+      let s = -uSlope + la;
+      while (s < sEnd) { plates.push({ start: s, len: pb }); s += pb; }
+    }
+    co += ph;
+    return { r, ph, sEnd, plates, abschnitt, verstichmassG };
+  });
+
+  return (
+    <div className="space-y-5">
+      {rds.map(({ r, ph, sEnd, plates, abschnitt, verstichmassG }) => {
+        const rowColor = r === 0 ? '#6fa8d4' : '#7fb87a';
+        return (
+          <div key={r} className="space-y-2">
+            <p className="text-[11px] font-semibold text-mu">Reihe {r + 1}</p>
+            <div className="flex flex-wrap gap-x-5 gap-y-4">
+              {plates.map(({ start, len }, i) => {
+                const isLast = i === plates.length - 1;
+
+                // Gaubendach cut (right side, left-leaning)
+                const cutBotLocal = sEnd - start;
+                const cutTopLocal = sEnd - verstichmassG - start;
+                const hasCut = cutBotLocal > 0.01 && cutTopLocal < len - 0.01;
+
+                // Vorderkante cut (left side, right-leaning):
+                // World-x formula: x_world = (start + x_local)·cosA − y_local·sinA
+                // Setting x_world=0 → x_local = y_local·tanA − start
+                // No co term — perpendicular row offset doesn't affect world-x.
+                const vkBotLocal = -start;           // VK hits bottom at this plate-local x
+                const vkTopLocal = ph * tanA - start; // VK hits top at this plate-local x
+                const hasVkCut = vkTopLocal > 0.01 && vkBotLocal < len - 0.01;
+
+                return (
+                  <div key={i} className="space-y-1">
+                    <p className="text-[9px] font-semibold text-dm">Platte {i + 1}</p>
+                    <EinzelplatteSVGSchraeg
+                      platteW={len} platteH={ph}
+                      hasCut={hasCut}
+                      cutBotLocal={hasCut ? cutBotLocal : 0}
+                      cutTopLocal={hasCut ? cutTopLocal : 0}
+                      hasVkCut={hasVkCut}
+                      vkBotLocal={hasVkCut ? vkBotLocal : 0}
+                      vkTopLocal={hasVkCut ? vkTopLocal : 0}
+                      abschnitt={isLast ? abschnitt : 0}
+                      gamma={gamma}
+                      tanAlpha={tanA}
+                      rowColor={rowColor}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

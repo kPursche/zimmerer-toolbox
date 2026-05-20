@@ -18,6 +18,7 @@ import {
   Columns2,
   type LucideIcon,
   Layers,
+  Mic,
   Ruler,
   Scroll,
   Triangle,
@@ -105,6 +106,15 @@ export const TOOLS: Tool[] = [
     description:
       "Klassische und moderne Richtsprüche für das Richtfest — passend zum Anlass.",
     icon: Scroll,
+    status: "coming-soon",
+    category: "Allgemein",
+  },
+  {
+    slug: "sprechzettel",
+    name: "Sprechzettel",
+    description:
+      "Stundenzettel per Sprache ausfüllen — einfach einsprechen, fertig.",
+    icon: Mic,
     status: "coming-soon",
     category: "Allgemein",
   },
