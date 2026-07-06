@@ -356,11 +356,14 @@ export function DachausmittlungTool() {
                   max={89}
                   step={0.5}
                   value={edges[selectedEdge].pitch_deg}
-                  onChange={(ev) =>
+                  onChange={(ev) => {
+                    // Auf 1–89° klemmen: 0° ergäbe 1/tan(0) = ∞ in der
+                    // Ausmittlung (min/max am Input verhindern Tippen nicht)
+                    const v = parseFloat(ev.target.value);
                     updateEdge(selectedEdge, {
-                      pitch_deg: parseFloat(ev.target.value) || 45,
-                    })
-                  }
+                      pitch_deg: isNaN(v) ? 45 : Math.min(89, Math.max(1, v)),
+                    });
+                  }}
                   className="mt-1"
                 />
               </div>

@@ -159,3 +159,21 @@ describe("Krueppelwalm-aehnlich: 12 x 8, Hauptdach 45, Walm steiler 60 Grad", ()
     expect(f!.laenge_mm).toBeCloseTo(erwartet, 1);
   });
 });
+
+describe("Randfall: ungueltige Neigung 0 Grad", () => {
+  // pitch 0 ergaebe speed = 1/tan(0) = Infinity und NaN-Propagation —
+  // validateGrundriss() muss das mit klarer Fehlermeldung ablehnen.
+  // (Die UI faengt die Exception und zeigt sie an; zusaetzlich klemmt
+  // das Neigungs-Input in dach-ausmittlung.tsx auf 1-89 Grad.)
+  const g = rechteck({
+    laenge_mm: 12000,
+    breite_mm: 8000,
+    edges: ["Traufe", "Walm", "Traufe", "Walm"],
+    pitches: [45, 0, 45, 0],
+    name: "Randfall-Neigung-0",
+  });
+
+  it("wirft eine verstaendliche Fehlermeldung statt NaN zu produzieren", () => {
+    expect(() => dachausmittlung(g)).toThrowError(/Neigung/);
+  });
+});

@@ -186,9 +186,19 @@ const p = useMemo(() => ({
     return null;
   }, [p]);
 
-  const erg = useMemo(() => {
-    if (fehler) return null;
-    return berechne(p.hvorne, p.alpha, p.gamma, p.b, p.t, p.achsabstand);
+  // Geometrie-Randfälle sind erst NACH der Berechnung erkennbar:
+  // innerVorne ≤ 0 (Holz-Tiefe frisst die Eckhöhe auf) bzw. T ≤ b
+  // ergäben sonst negative/unsinnige Längen in der Anzeige.
+  const { erg, geoFehler } = useMemo((): { erg: Ergebnis | null; geoFehler: string | null } => {
+    if (fehler) return { erg: null, geoFehler: null };
+    const r = berechne(p.hvorne, p.alpha, p.gamma, p.b, p.t, p.achsabstand);
+    if (!isFinite(r.T) || r.L_eckstaender <= 0) {
+      return { erg: null, geoFehler: "Eckhöhe vorne ist zu klein für die gewählte Holz-Tiefe — es bleibt kein Ständerraum übrig." };
+    }
+    if (r.T <= p.b) {
+      return { erg: null, geoFehler: "Unrealistische Geometrie: Die Wangentiefe bis zum First ist kleiner als die Holz-Breite — bitte Neigungen oder Eckhöhe prüfen." };
+    }
+    return { erg: r, geoFehler: null };
   }, [fehler, p]);
 
   const [ep, setEp] = useState<PlattenEingaben>({ platteBreite: '250', platteHoehe: '62.5', ersteReiheHoehe: '', ueberstand: '0', mindestversatz: '0', verlegeart: 'schraeg' });
@@ -199,7 +209,7 @@ const p = useMemo(() => ({
   );
 
   const plattenErg = useMemo(() => {
-    if (fehler) return null;
+    if (fehler || geoFehler) return null;
 
     if (ep.verlegeart === 'waagerecht') {
       const tanA = Math.tan(toRad(p.alpha));
@@ -281,7 +291,7 @@ const p = useMemo(() => ({
       firstLen         = abschnitt - 5;
     }
     return rows;
-  }, [fehler, p, ep]);
+  }, [fehler, geoFehler, p, ep]);
 
   return (
     <div className="space-y-5">
@@ -329,10 +339,10 @@ const p = useMemo(() => ({
       </Card>
 
       {/* ── Fehler ── */}
-      {fehler && (
+      {(fehler ?? geoFehler) && (
         <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{fehler}</span>
+          <span>{fehler ?? geoFehler}</span>
         </div>
       )}
 
