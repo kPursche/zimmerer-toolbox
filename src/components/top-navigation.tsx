@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ChevronRight, Hammer, LogIn, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { OfflineBadge } from "@/components/offline-badge";
 import { getToolBySlug } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +66,9 @@ export function TopNavigation() {
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Offline-Indikator (PROJ-7) */}
+        <OfflineBadge />
 
         {/* Community-Link */}
         <Button

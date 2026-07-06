@@ -1,6 +1,6 @@
 # PROJ-7: PWA-Support (Offline, Installierbar)
 
-**Status:** Planned
+**Status:** In Review
 **Priorität:** P1
 **Erstellt:** 2026-05-02
 
