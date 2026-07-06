@@ -103,7 +103,13 @@ export function CommunityFeed() {
   }
 
   async function handleDelete(id: string) {
-    await supabase.from("community_feed").delete().eq("id", id);
+    // Läuft über die Server-Route: dort wird die session_id geprüft,
+    // direktes Löschen per Anon-Key ist durch RLS gesperrt.
+    await fetch("/api/community/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, session_id: sessionId }),
+    });
   }
 
   function handleReply(msg: FeedMessage) {

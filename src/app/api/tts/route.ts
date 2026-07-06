@@ -2,6 +2,7 @@ import { config } from "dotenv";
 config({ path: ".env.local", override: false });
 import { NextRequest, NextResponse } from "next/server";
 import { ElevenLabsClient } from "elevenlabs";
+import { rateLimit } from "@/lib/rate-limit";
 
 // ─── Deutsche Zahlwörter ──────────────────────────────────────────────────────
 
@@ -65,16 +66,25 @@ function bereinige(text: string): string {
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
+// ElevenLabs rechnet pro Zeichen ab — Länge hart begrenzen
+const MAX_TEXT_LEN = 600;
+
 export async function POST(req: NextRequest) {
-  if (!process.env.ELEVENLABS_API_KEY) {
-    return NextResponse.json({ error: "ELEVENLABS_API_KEY nicht konfiguriert" }, { status: 500 });
-  }
+  const limited = rateLimit("tts", req, 20, 60_000);
+  if (limited) return limited;
 
   const body = await req.json();
   const text = body.text as string | undefined;
 
-  if (!text) {
+  if (!text || typeof text !== "string") {
     return NextResponse.json({ error: "Kein Text gesendet" }, { status: 400 });
+  }
+  if (text.length > MAX_TEXT_LEN) {
+    return NextResponse.json({ error: "Text zu lang für Sprachausgabe" }, { status: 400 });
+  }
+
+  if (!process.env.ELEVENLABS_API_KEY) {
+    return NextResponse.json({ error: "ELEVENLABS_API_KEY nicht konfiguriert" }, { status: 500 });
   }
 
   const elevenlabs = new ElevenLabsClient({ apiKey: process.env.ELEVENLABS_API_KEY });

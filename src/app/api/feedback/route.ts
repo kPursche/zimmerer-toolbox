@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
+
+const MAX_NAME_LEN = 100;
+const MAX_MESSAGE_LEN = 2000;
 
 export async function POST(req: NextRequest) {
+  const limited = rateLimit("feedback", req, 5, 60_000);
+  if (limited) return limited;
+
   const { message, name } = await req.json();
 
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return NextResponse.json({ error: "Nachricht fehlt" }, { status: 400 });
+  }
+  if (message.trim().length > MAX_MESSAGE_LEN) {
+    return NextResponse.json({ error: `Nachricht zu lang (max. ${MAX_MESSAGE_LEN} Zeichen)` }, { status: 400 });
+  }
+  if (name && (typeof name !== "string" || name.trim().length > MAX_NAME_LEN)) {
+    return NextResponse.json({ error: `Name zu lang (max. ${MAX_NAME_LEN} Zeichen)` }, { status: 400 });
   }
 
   const topic = process.env.NTFY_TOPIC;

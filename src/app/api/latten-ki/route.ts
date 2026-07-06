@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { rateLimit } from "@/lib/rate-limit";
+
+// Limits gegen Missbrauch (OpenAI-Aufrufe kosten Geld)
+const MAX_PROMPT_LEN = 500;
+const MAX_ABSTAENDE = 500;
 
 export async function POST(req: NextRequest) {
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "OPENAI_API_KEY nicht konfiguriert" }, { status: 500 });
-  }
+  const limited = rateLimit("latten-ki", req, 20, 60_000);
+  if (limited) return limited;
 
   const body = await req.json();
   const prompt = body.prompt as string | undefined;
@@ -16,8 +20,18 @@ export async function POST(req: NextRequest) {
     abstaende: Array<{ nr: number; position: number }>;
   } | undefined;
 
-  if (!prompt) {
+  if (!prompt || typeof prompt !== "string") {
     return NextResponse.json({ error: "Keine Anfrage gesendet" }, { status: 400 });
+  }
+  if (prompt.length > MAX_PROMPT_LEN) {
+    return NextResponse.json({ error: "Anfrage zu lang" }, { status: 400 });
+  }
+  if (context?.abstaende && context.abstaende.length > MAX_ABSTAENDE) {
+    return NextResponse.json({ error: "Zu viele Lattenpositionen" }, { status: 400 });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: "OPENAI_API_KEY nicht konfiguriert" }, { status: 500 });
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
