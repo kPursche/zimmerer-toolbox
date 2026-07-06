@@ -16,6 +16,13 @@ import { Label } from "@/components/ui/label";
 import dynamic from "next/dynamic";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  berechneLattenmass,
+  kronenPositionen,
+  lattenPositionen,
+  type BerechnungErgebnis,
+  type LattenAbstand,
+} from "@/lib/latten";
 
 const PfannenAuswahl = dynamic(
   () => import("@/components/tools/pfannen-auswahl").then((m) => m.PfannenAuswahl),
@@ -37,12 +44,6 @@ interface Eingaben {
   einzuteilendeLaenge: string; // in cm
 }
 
-interface LattenAbstand {
-  nr: number;
-  abstand: number; // in cm
-  position: number; // in cm
-}
-
 interface KiContext {
   gesamtMass: number | null;
   anzahlLatten: number | null;
@@ -51,33 +52,7 @@ interface KiContext {
   abstaende: Array<{ nr: number; position: number }>;
 }
 
-// ─── Berechnung ───────────────────────────────────────────────────────────────
-
-interface BerechnungErgebnis {
-  la: number;    // Decklänge in mm (= la_a + la_b bei Krone, = Lattenabstand bei Doppel)
-  n: number;     // Anzahl Felder (Doppel) bzw. Zyklen (Krone)
-  ok: boolean;
-  la_a?: number; // kurze Teilung Kronendeckung (= HB, halbe Ziegelbreite)
-  la_b?: number; // lange Teilung Kronendeckung (= la − HB)
-}
-
-function berechneLattenmass(L: number, la_min: number, la_max: number): BerechnungErgebnis {
-  const la_ziel = (la_min + la_max) / 2;
-  let n = Math.max(1, Math.round(L / la_ziel));
-  let la = L / n;
-  while (la > la_max && n < 10000) { n++; la = L / n; }
-  while (la < la_min && n > 1)    { n--; la = L / n; }
-  return { la, n, ok: la >= la_min && la <= la_max };
-}
-
-function lattenPositionen(n: number, la: number): LattenAbstand[] {
-  const laCm = la / 10;
-  const result: LattenAbstand[] = [];
-  for (let i = 1; i <= n; i++) {
-    result.push({ nr: i, abstand: laCm, position: i * laCm });
-  }
-  return result;
-}
+// Berechnungslogik: siehe @/lib/latten (dort auch getestet)
 
 // ─── Audio-Funktionen ─────────────────────────────────────────────────────────
 
@@ -208,16 +183,7 @@ export function LatteneinteilungTool() {
     if (!berechnung) return [];
     if (berechnung.la_a !== undefined && berechnung.la_b !== undefined) {
       // Kronendeckung: alternierend la_a (kurz) und la_b (lang)
-      const result: LattenAbstand[] = [];
-      let pos = 0;
-      let nr = 1;
-      for (let i = 0; i < berechnung.n; i++) {
-        pos += berechnung.la_a;
-        result.push({ nr: nr++, abstand: berechnung.la_a / 10, position: pos / 10 });
-        pos += berechnung.la_b;
-        result.push({ nr: nr++, abstand: berechnung.la_b / 10, position: pos / 10 });
-      }
-      return result;
+      return kronenPositionen(berechnung.n, berechnung.la_a, berechnung.la_b);
     }
     return lattenPositionen(berechnung.n, berechnung.la);
   }, [berechnung]);

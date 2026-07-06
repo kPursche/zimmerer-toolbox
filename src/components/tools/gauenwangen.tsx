@@ -9,38 +9,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  applyMindestversatz,
+  berechneGauenwangen,
+  berechnePlattenSchraeg,
+  berechnePlattenWaagerecht,
+  toRad,
+  type Ergebnis,
+  type Lotholz,
+} from "@/lib/geometry/gauenwangen";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const toRad = (deg: number) => (deg * Math.PI) / 180;
 const fmt   = (v: number, dec = 1) => v.toFixed(dec);
 const round1 = (v: number) => Math.round(v * 10) / 10;
-
-// Verschiebt den ersten Plattenstoss einer Reihe, damit der Mindestversatz
-// zur Fugenreihe darunter eingehalten wird.
-// prevOffset = Position des ersten Stosses der Vorreihe.
-// Nach jeder Verschiebung wird erneut geprüft (max. 3 Durchläufe), weil eine
-// Verschiebung die Fuge zu nah an eine andere Vorreihen-Fuge bringen kann.
-function applyMindestversatz(la: number, prevOffset: number, pb: number, mv: number): number {
-  if (mv <= 0 || la <= 0) return la;
-
-  for (let i = 0; i < 3; i++) {
-    const d = ((la - prevOffset) % pb + pb) % pb; // Abstand zur nächstliegenden Vorreihen-Fuge
-    if (d >= mv && pb - d >= mv) return la;        // gültiger Bereich erreicht
-
-    if (d < mv) {
-      // Fuge liegt d cm rechts einer Vorreihen-Fuge — zu nah.
-      // Stoss um (d + mv) nach links verschieben; wenn das negativ wäre, pb addieren (Wrap).
-      const adjBack = la - d - mv;
-      la = adjBack > 0 ? adjBack : adjBack + pb;
-    } else {
-      // pb - d < mv: Fuge liegt (pb-d) cm vor der nächsten Vorreihen-Fuge — zu nah
-      const adjFwd = la + (pb - d) - mv;           // links: mv cm vor die nächste Vorreihen-Fuge
-      la = adjFwd > 0 ? adjFwd : la + (pb - d) + mv; // rechts: mv cm nach der nächsten Vorreihen-Fuge
-    }
-  }
-  return la;
-}
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
@@ -53,23 +35,6 @@ interface Eingaben {
   achsabstand:        string;
 }
 
-interface Lotholz {
-  nr:       number;
-  abstand:  number;
-  hoehe:    number; // lotrechte Länge (= Innenmass zwischen den Hölzern)
-}
-
-interface Ergebnis {
-  T:                  number; // horizontale Tiefe
-  yFirst:             number; // Höhe des First-Punkts (Referenzlinie)
-  L_eckstaender:      number; // = hvorne (lotrecht)
-  L_gaubendach:       number;
-  L_hauptdach:        number;
-  schnittVorneGaube:  number; // Schnitt Gaubenholz an Vorderkante
-  schnittFirst:       number; // Schnitt am First (beide Hölzer)
-  lothölzer:          Lotholz[];
-}
-
 interface PlattenEingaben {
   platteBreite:    string;
   platteHoehe:     string;
@@ -80,72 +45,7 @@ interface PlattenEingaben {
 }
 
 
-// ─── Berechnung ───────────────────────────────────────────────────────────────
-//
-// Koordinatensystem:  x = horizontal (Vorderkante → First), y = lotrecht (↑)
-// hvorne = Gesamthöhe der Ecke (Außenmaß: Unterkante Hauptdachholz → Oberkante Gaubenholz)
-//
-// Lotschmiegen (lotrechte Holzdicken-Projektionen):
-//   lotA = t · cos α   (Hauptdachholz)
-//   lotG = t · cos γ   (Gaubenholz)
-//
-// Ständer-Innenmass an der Vorderkante (x = 0):
-//   innerVorne = hvorne − lotA − lotG
-//
-// Referenzlinien (= Innenflächen der Hölzer zum Ständerraum):
-//   Hauptdach-Innenfläche:   y_H(x) = lotA + x · tan α
-//   Gaubendach-Innenfläche:  y_G(x) = (hvorne − lotG) + x · tan γ
-//
-// Ständerhöhe bei x:  h(x) = y_G(x) − y_H(x) = innerVorne − x·(tanα − tanγ)
-// First bei h(T) = 0: T = innerVorne / (tanα − tanγ)
-
-function berechne(
-  hvorne:     number,
-  alphaDeg:   number,
-  gammaDeg:   number,
-  b:          number,
-  t:          number,
-  achsabstand: number,
-): Ergebnis {
-  const alpha = toRad(alphaDeg);
-  const gamma = toRad(gammaDeg);
-  const tanA  = Math.tan(alpha);
-  const tanG  = Math.tan(gamma);
-  const cosA  = Math.cos(alpha);
-  const cosG  = Math.cos(gamma);
-
-  // Lotschmiegen = lotrechte Projektion der Holztiefe t
-  const lotA = t * cosA;
-  const lotG = t * cosG;
-
-  // Innenmass an der Vorderkante = tatsächliche Eckständer-Länge
-  const innerVorne = hvorne - lotA - lotG;
-
-  const T      = innerVorne / (tanA - tanG);
-  const yFirst = lotA + T * tanA; // Schnittpunkt der Referenzlinien
-
-  // Eckständer = Innenmass an x=0 (zwischen den Innenflächen der Hölzer)
-  const L_eckstaender = innerVorne;
-
-  // Längen der Dachkanthölzer
-  const L_hauptdach  = (T - b) / cosA;
-  const L_gaubendach = (T + b) / cosG;
-
-  // Schnittwinkel
-  const schnittVorneGaube = 90 - gammaDeg;
-  const schnittFirst      = alphaDeg - gammaDeg;
-
-  // Lothölzer: Innenmass zwischen y_H(x) und y_G(x)
-  const lothölzer: Lotholz[] = [];
-  for (let x = achsabstand; x < T - b / 2; x += achsabstand) {
-    const hoehe = innerVorne - x * (tanA - tanG);
-    if (hoehe > 1) {
-      lothölzer.push({ nr: lothölzer.length + 1, abstand: x, hoehe });
-    }
-  }
-
-  return { T, yFirst, L_eckstaender, L_gaubendach, L_hauptdach, schnittVorneGaube, schnittFirst, lothölzer };
-}
+// Berechnungslogik: siehe @/lib/geometry/gauenwangen (dort auch getestet)
 
 
 // ─── Haupt-Komponente ─────────────────────────────────────────────────────────
@@ -191,7 +91,7 @@ const p = useMemo(() => ({
   // ergäben sonst negative/unsinnige Längen in der Anzeige.
   const { erg, geoFehler } = useMemo((): { erg: Ergebnis | null; geoFehler: string | null } => {
     if (fehler) return { erg: null, geoFehler: null };
-    const r = berechne(p.hvorne, p.alpha, p.gamma, p.b, p.t, p.achsabstand);
+    const r = berechneGauenwangen(p.hvorne, p.alpha, p.gamma, p.b, p.t, p.achsabstand);
     if (!isFinite(r.T) || r.L_eckstaender <= 0) {
       return { erg: null, geoFehler: "Eckhöhe vorne ist zu klein für die gewählte Holz-Tiefe — es bleibt kein Ständerraum übrig." };
     }
@@ -211,86 +111,21 @@ const p = useMemo(() => ({
   const plattenErg = useMemo(() => {
     if (fehler || geoFehler) return null;
 
-    if (ep.verlegeart === 'waagerecht') {
-      const tanA = Math.tan(toRad(p.alpha));
-      const tanG = Math.tan(toRad(p.gamma));
-      const yF   = (p.hvorne / (tanA - tanG)) * tanA; // Firsthöhe (Ecke B)
-      const pb   = parseFloat(ep.platteBreite) || 250;
-      const ph0  = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
-      const phN  = parseFloat(ep.platteHoehe) || 62.5;
-      const uH   = parseFloat(ep.ueberstand) || 0;
-      const mv   = parseFloat(ep.mindestversatz) || 0;
+    // Parsen (mit Defaults) bleibt hier — Rechnen passiert in der Lib
+    const params = {
+      hvorne:          p.hvorne,
+      alphaDeg:        p.alpha,
+      gammaDeg:        p.gamma,
+      plattenBreite:   parseFloat(ep.platteBreite) || 250,
+      ersteReiheHoehe: parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5,
+      plattenHoehe:    parseFloat(ep.platteHoehe) || 62.5,
+      ueberstand:      parseFloat(ep.ueberstand) || 0,
+      mindestversatz:  parseFloat(ep.mindestversatz) || 0,
+    };
 
-      type RowErgW = { r: number; la: number; laRaw: number; abschnitt: number };
-      const rowsW: RowErgW[] = [];
-      let coY = 0;
-      let firstLen: number | null = null;
-      let prevJointOffset = 0;
-
-      for (let r = 0; r < 60; r++) {
-        const ph   = r === 0 ? ph0 : phN;
-        if (coY >= yF) break;
-        const sEnd = Math.min((coY + ph) / tanA, yF / tanA); // nie über B hinaus
-        if (sEnd <= 0.1) break;
-
-        const laRaw: number = (firstLen !== null && firstLen > 0) ? firstLen : pb;
-
-        // xStart muss VOR der Mindestversatz-Prüfung stehen, da er sich ab coY ≥ hvorne
-        // ändert und die absolute Fugenposition bestimmt.
-        const xStart = coY >= p.hvorne ? (coY - p.hvorne) / tanG : -uH;
-        const absRaw = xStart + laRaw;
-        const absAdj = r === 0 ? absRaw : applyMindestversatz(absRaw, prevJointOffset, pb, mv);
-        const la     = absAdj - xStart;
-
-        let s: number = xStart + la;
-        while (s < sEnd) s += pb;
-        const abschnitt: number = s - sEnd;
-
-        rowsW.push({ r, la, laRaw, abschnitt });
-        coY             += ph;
-        prevJointOffset  = r === 0 ? 0 : absAdj;
-        firstLen         = abschnitt - 5;
-      }
-      return rowsW;
-    }
-
-    const cosA  = Math.cos(toRad(p.alpha));
-    const tanG  = Math.tan(toRad(p.gamma));
-    const cosG  = Math.cos(toRad(p.gamma));
-    const sinAG = Math.sin(toRad(p.alpha - p.gamma));
-    const pb      = parseFloat(ep.platteBreite) || 250;
-    const ph0     = parseFloat(ep.ersteReiheHoehe) || parseFloat(ep.platteHoehe) || 62.5;
-    const phN     = parseFloat(ep.platteHoehe) || 62.5;
-    const uSlope  = (parseFloat(ep.ueberstand) || 0) / cosA;
-    const mv      = parseFloat(ep.mindestversatz) || 0;
-
-    type RowErg = { r: number; la: number; laRaw: number; abschnitt: number };
-    const rows: RowErg[] = [];
-    let co               = 0;
-    let firstLen: number | null = null;
-    let prevJointOffset  = 0; // Fugenversatz der Vorreihe (0 = Reihe-0-Muster)
-
-    for (let r = 0; r < 60; r++) {
-      const ph   = r === 0 ? ph0 : phN;
-      const sEnd = (p.hvorne - co / cosA) * cosG / sinAG;
-      if (sEnd <= 0.1) break;
-
-      const laRaw: number = (firstLen !== null && firstLen > 0) ? firstLen : pb;
-
-      const la: number = r === 0
-        ? laRaw
-        : applyMindestversatz(laRaw, prevJointOffset, pb, mv);
-
-      let s: number           = -uSlope + la;
-      while (s < sEnd) s += pb;
-      const abschnitt: number = s - sEnd;
-
-      rows.push({ r, la, laRaw, abschnitt });
-      co              += ph;
-      prevJointOffset  = r === 0 ? 0 : la;
-      firstLen         = abschnitt - 5;
-    }
-    return rows;
+    return ep.verlegeart === 'waagerecht'
+      ? berechnePlattenWaagerecht(params)
+      : berechnePlattenSchraeg(params);
   }, [fehler, geoFehler, p, ep]);
 
   return (
