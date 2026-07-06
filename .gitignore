@@ -34,5 +34,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
-.env*.local
+# temporäre Artefakte (Scraper-Downloads, Scan-Ausgaben)
+tmp-*.pdf
+tmp-*
+*-scan-ergebnisse.html
