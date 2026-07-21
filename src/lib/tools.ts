@@ -80,7 +80,7 @@ export const TOOLS: Tool[] = [
     description:
       "Grundriss mit dem Finger zeichnen, Kanten als Traufe/Walm/Giebel beschriften und First, Grate, Sparrenlängen in mm berechnen.",
     icon: Home,
-    status: "available",
+    status: "coming-soon",
     category: "Dach",
     whatsNext: [
       "L-/T-förmige Grundrisse mit Kehlen",
@@ -131,8 +131,12 @@ export const TOOLS: Tool[] = [
     description:
       "Stundenzettel per Sprache ausfüllen — einfach einsprechen, fertig.",
     icon: Mic,
-    status: "coming-soon",
+    status: "available",
     category: "Allgemein",
+    whatsNext: [
+      "Baustelle mit Projektverwaltung verknüpfen.",
+      "Mehrere Einträge pro Tag.",
+    ],
   },
 ];
 
