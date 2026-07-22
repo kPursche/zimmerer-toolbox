@@ -20,8 +20,9 @@
 | PROJ-6 | Ergebnisse speichern & Verlauf | Planned | [PROJ-6-ergebnisse-speichern.md](PROJ-6-ergebnisse-speichern.md) | 2026-05-02 |
 | PROJ-7 | PWA-Support (Offline, Installierbar) | In Review | [PROJ-7-pwa.md](PROJ-7-pwa.md) | 2026-05-02 |
 | PROJ-8 | Sprechzettel (Stundenzettel per Diktat) | In Review | [PROJ-8-sprechzettel.md](PROJ-8-sprechzettel.md) | 2026-07-21 |
+| PROJ-9 | Holzrahmenbau-Wandplaner | In Review | [PROJ-9-wandplaner.md](PROJ-9-wandplaner.md) | 2026-07-22 |
 
-## Next Available ID: PROJ-9
+## Next Available ID: PROJ-10
 
 ## Deployment
 

@@ -16,6 +16,7 @@ import {
   Calculator,
   Car,
   Columns2,
+  Columns3,
   Home,
   type LucideIcon,
   Layers,
@@ -124,6 +125,19 @@ export const TOOLS: Tool[] = [
     icon: Scroll,
     status: "coming-soon",
     category: "Allgemein",
+  },
+  {
+    slug: "wandplaner",
+    name: "Holzrahmenbau-Wandplaner",
+    description:
+      "Seitenansicht einer Holzrahmenbauwand aus Breite, Schwellen-/Rähmhöhe und Wandhöhe links/rechts — inkl. Pfosten-Stückliste mit Positionen, Längen und Winkeln.",
+    icon: Columns3,
+    status: "available",
+    category: "Holz",
+    whatsNext: [
+      "Öffnungen (Fenster/Türen) berücksichtigen.",
+      "Pfostenbreite/-tiefe für Materialliste.",
+    ],
   },
   {
     slug: "sprechzettel",

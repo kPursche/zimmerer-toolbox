@@ -12,6 +12,7 @@ import { LatteneinteilungTool } from "@/components/tools/latteneinteilung";
 import { BodenDeckelschaulungTool } from "@/components/tools/boden-deckelschalung";
 import { DachausmittlungTool } from "@/components/tools/dach-ausmittlung";
 import { SprechzettelTool } from "@/components/tools/sprechzettel";
+import { WandplanerTool } from "@/components/tools/wandplaner";
 
 interface ToolPageProps {
   params: Promise<{ slug: string }>;
@@ -90,6 +91,8 @@ export default async function ToolPage({ params }: ToolPageProps) {
         <DachausmittlungTool />
       ) : slug === "sprechzettel" ? (
         <SprechzettelTool />
+      ) : slug === "wandplaner" ? (
+        <WandplanerTool />
       ) : (
         <Card className="border-dashed bg-s1/60">
           <CardHeader>
