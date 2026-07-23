@@ -16,6 +16,7 @@ export interface WandplanerEingabe {
   wandhoeheLinks: number;
   wandhoeheRechts: number;
   pfostenabstandSoll: number;
+  staenderbreite?: number;
   positionsUeberschreibungen?: Record<number, number>;
 }
 
@@ -29,9 +30,16 @@ export interface Pfosten {
 export interface WandplanerErgebnis {
   positionen: number[];
   winkel: number;
+  raehmLaenge: number;
+  verstichmass: number;
   stueckliste: Pfosten[];
   ok: boolean;
 }
+
+// Referenzlänge (cm), auf die sich das Verstichmaß bezieht — "auf 100 cm
+// Anschlag X cm Verstich" ist die gebräuchliche Bezugsgröße zum Einstellen
+// einer Schmiege ohne Winkelmesser.
+export const VERSTICH_REFERENZLAENGE = 100;
 
 // Festes Raster ab der linken Kante (x=0) in Schritten von `abstandSoll`;
 // das letzte Feld ist der Rest und kann kürzer als `abstandSoll` sein.
@@ -63,8 +71,28 @@ export function wandhoeheAnPosition(
   return wandhoeheLinks + (wandhoeheRechts - wandhoeheLinks) * anteil;
 }
 
-// Pfostenlänge = Wandhöhe an der Position minus Schwellen- und Rähmstärke,
-// da der Pfosten zwischen OK Schwelle und UK Rähm sitzt.
+// Bei geneigtem Rähm hat ein Pfosten mit eigener Ständerbreite zwei
+// unterschiedlich hohe Kanten (Vorder-/Rückkante in Richtung der Neigung).
+// Für den Zuschnitt zählt die höhere Kante — sonst wäre der Rohling an der
+// langen Kante zu kurz. Bei staenderbreite=0 (oder waagerechtem Rähm) fallen
+// beide Kanten auf die Mittelachse zusammen.
+export function pfostenOberkanteMax(
+  x: number,
+  breite: number,
+  wandhoeheLinks: number,
+  wandhoeheRechts: number,
+  staenderbreite: number,
+): number {
+  const halbeStaenderbreite = staenderbreite / 2;
+  return Math.max(
+    wandhoeheAnPosition(x - halbeStaenderbreite, breite, wandhoeheLinks, wandhoeheRechts),
+    wandhoeheAnPosition(x + halbeStaenderbreite, breite, wandhoeheLinks, wandhoeheRechts),
+  );
+}
+
+// Pfostenlänge (Rohlänge für den Zuschnitt) = höchste Kante des Pfostens
+// minus Schwellen- und Rähmstärke, da der Pfosten zwischen OK Schwelle und
+// UK Rähm sitzt.
 export function pfostenLaenge(
   x: number,
   breite: number,
@@ -72,9 +100,10 @@ export function pfostenLaenge(
   wandhoeheRechts: number,
   schwellenhoehe: number,
   raehmhoehe: number,
+  staenderbreite: number = 0,
 ): number {
   return (
-    wandhoeheAnPosition(x, breite, wandhoeheLinks, wandhoeheRechts) -
+    pfostenOberkanteMax(x, breite, wandhoeheLinks, wandhoeheRechts, staenderbreite) -
     schwellenhoehe -
     raehmhoehe
   );
@@ -90,6 +119,48 @@ export function raehmWinkelGrad(
 ): number {
   if (breite <= 0) return 0;
   return (Math.atan((wandhoeheLinks - wandhoeheRechts) / breite) * 180) / Math.PI;
+}
+
+// Länge über Alles des Rähms: bei geneigtem Rähm ist die tatsächliche
+// (schräge) Länge des Holzes größer als die Wandbreite (horizontale
+// Projektion) — maßgeblich für die Bestelllänge.
+export function raehmLaengeUeberAlles(
+  breite: number,
+  wandhoeheLinks: number,
+  wandhoeheRechts: number,
+): number {
+  const hoehendifferenz = wandhoeheLinks - wandhoeheRechts;
+  return Math.sqrt(breite * breite + hoehendifferenz * hoehendifferenz);
+}
+
+// Verstichmaß zum Einstellen einer Schmiege ohne Winkelmesser: auf
+// `referenzlaenge` (Anschlag) entlang der Waagerechten entspricht der
+// Neigung ein Versatz (Verstich) von so vielen cm. Positiv, wenn die Wand
+// links höher ist als rechts (gleiches Vorzeichen wie raehmWinkelGrad).
+export function verstichmass(
+  breite: number,
+  wandhoeheLinks: number,
+  wandhoeheRechts: number,
+  referenzlaenge: number = VERSTICH_REFERENZLAENGE,
+): number {
+  if (breite <= 0) return 0;
+  return (referenzlaenge * (wandhoeheLinks - wandhoeheRechts)) / breite;
+}
+
+// Rückt die beiden Randpfosten (erster/letzter Eintrag im Positions-Raster)
+// so weit nach innen, dass ihre Außenkante bündig mit Schwelle/Rähm-Ende
+// abschließt, statt mit der Mittelachse auf x=0 bzw. x=breite zu sitzen.
+function mitBuendigenRandpfosten(
+  basis: number[],
+  breite: number,
+  staenderbreite: number,
+): number[] {
+  if (basis.length < 2 || staenderbreite <= 0) return basis;
+  const positionen = basis.slice();
+  const halbeStaenderbreite = staenderbreite / 2;
+  positionen[0] = halbeStaenderbreite;
+  positionen[positionen.length - 1] = breite - halbeStaenderbreite;
+  return positionen;
 }
 
 // Wendet manuelle Positions-Überschreibungen (Pfosten-Index → x) auf das
@@ -116,21 +187,25 @@ export function berechneWand(eingabe: WandplanerEingabe): WandplanerErgebnis {
     wandhoeheLinks,
     wandhoeheRechts,
     pfostenabstandSoll,
+    staenderbreite = 0,
     positionsUeberschreibungen = {},
   } = eingabe;
 
   const basis = pfostenPositionen(breite, pfostenabstandSoll);
-  const positionen = anwendenUeberschreibungen(basis, breite, positionsUeberschreibungen);
+  const basisBuendig = mitBuendigenRandpfosten(basis, breite, staenderbreite);
+  const positionen = anwendenUeberschreibungen(basisBuendig, breite, positionsUeberschreibungen);
   const winkel = raehmWinkelGrad(breite, wandhoeheLinks, wandhoeheRechts);
+  const raehmLaenge = raehmLaengeUeberAlles(breite, wandhoeheLinks, wandhoeheRechts);
+  const verstich = verstichmass(breite, wandhoeheLinks, wandhoeheRechts);
 
   const stueckliste: Pfosten[] = positionen.map((x, i) => ({
     nr: i + 1,
     x,
-    laenge: pfostenLaenge(x, breite, wandhoeheLinks, wandhoeheRechts, schwellenhoehe, raehmhoehe),
+    laenge: pfostenLaenge(x, breite, wandhoeheLinks, wandhoeheRechts, schwellenhoehe, raehmhoehe, staenderbreite),
     winkel,
   }));
 
   const ok = stueckliste.length > 0 && stueckliste.every((p) => p.laenge > 0);
 
-  return { positionen, winkel, stueckliste, ok };
+  return { positionen, winkel, raehmLaenge, verstichmass: verstich, stueckliste, ok };
 }

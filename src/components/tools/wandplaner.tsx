@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertCircle, FileDown, FileText, RotateCcw } from "lucide-react";
+import { AlertCircle, FileDown, FileText, ListRestart, RotateCcw } from "lucide-react";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -84,7 +84,8 @@ function Feld({
 // ── SVG Seitenansicht ─────────────────────────────────────────────────────────
 
 function WandSVG({
-  breite, schwellenhoehe, raehmhoehe, wandhoeheLinks, wandhoeheRechts, positionen,
+  breite, schwellenhoehe, raehmhoehe, wandhoeheLinks, wandhoeheRechts, positionen, staenderbreite,
+  winkel, raehmLaenge, verstich,
 }: {
   breite: number;
   schwellenhoehe: number;
@@ -92,10 +93,15 @@ function WandSVG({
   wandhoeheLinks: number;
   wandhoeheRechts: number;
   positionen: number[];
+  staenderbreite: number;
+  winkel: number;
+  raehmLaenge: number;
+  verstich: number;
 }) {
+  const geneigt = Math.abs(winkel) > 1e-6;
   const gesamthoeheMax = Math.max(wandhoeheLinks, wandhoeheRechts);
   const SVG_W = 600;
-  const PAD = { l: 52, r: 16, t: 16, b: 48 };
+  const PAD = { l: 52, r: 16, t: geneigt ? 48 : 16, b: 48 };
   const maxDrawW = SVG_W - PAD.l - PAD.r;
   const maxDrawH = 340;
   const scale = Math.min(maxDrawW / breite, maxDrawH / gesamthoeheMax);
@@ -125,15 +131,63 @@ function WandSVG({
         fill={C_RAEHM}
       />
 
-      {/* Pfosten (Mittellinie, Randpfosten eingeschlossen) */}
-      {positionen.map((x, i) => (
-        <line
-          key={i}
-          x1={sx(x)} y1={sy(schwellenhoehe)}
-          x2={sx(x)} y2={sy(wandhoeheAn(x) - raehmhoehe)}
-          stroke={C_PFOSTEN} strokeWidth="3"
-        />
-      ))}
+      {/* Pfosten (in tatsächlicher Ständerbreite, Randpfosten außen bündig).
+          Kopf mit echter Schmiege gezeichnet: Ober­kante folgt der Rähm-Neigung
+          statt eines rechtwinkeligen Abschnitts. */}
+      {positionen.map((x, i) => {
+        const breitePx = Math.max(staenderbreite * scale, 2);
+        const halbeStaenderbreite = staenderbreite / 2;
+        const yObenLinks = wandhoeheAn(x - halbeStaenderbreite) - raehmhoehe;
+        const yObenRechts = wandhoeheAn(x + halbeStaenderbreite) - raehmhoehe;
+        const xLinks = sx(x) - breitePx / 2;
+        const xRechts = sx(x) + breitePx / 2;
+        const yUnten = sy(schwellenhoehe);
+        return (
+          <polygon
+            key={i}
+            points={`${xLinks},${yUnten} ${xRechts},${yUnten} ${xRechts},${sy(yObenRechts)} ${xLinks},${sy(yObenLinks)}`}
+            fill={C_PFOSTEN}
+          />
+        );
+      })}
+
+      {/* Maßkette Rähm (Länge über Alles + Verstichmaß für die Schmiege),
+          nur bei geneigtem Rähm — bei waagerechtem Rähm entspricht die Länge
+          ohnehin der Wandbreite unten. */}
+      {geneigt && (() => {
+        const ax = sx(0), ay = sy(wandhoeheLinks);
+        const bx = sx(breite), by = sy(wandhoeheRechts);
+        const dx = bx - ax, dy = by - ay;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        let nx = -dy / len, ny = dx / len;
+        if (ny > 0) { nx = -nx; ny = -ny; }
+        const OFFSET = 14;
+        const p1x = ax + nx * OFFSET, p1y = ay + ny * OFFSET;
+        const p2x = bx + nx * OFFSET, p2y = by + ny * OFFSET;
+        const midx = (p1x + p2x) / 2, midy = (p1y + p2y) / 2;
+        let textRot = (Math.atan2(dy, dx) * 180) / Math.PI;
+        if (textRot > 90) textRot -= 180;
+        if (textRot < -90) textRot += 180;
+        return (
+          <g>
+            <line x1={ax} y1={ay} x2={p1x} y2={p1y} stroke={C_DIM} strokeWidth="0.8" />
+            <line x1={bx} y1={by} x2={p2x} y2={p2y} stroke={C_DIM} strokeWidth="0.8" />
+            <line x1={p1x} y1={p1y} x2={p2x} y2={p2y} stroke={C_DIM} strokeWidth="0.8" />
+            <text
+              x={midx} y={midy - 4} fontSize="10" fill={C_DIM} textAnchor="middle"
+              transform={`rotate(${textRot}, ${midx}, ${midy - 4})`}
+            >
+              {formatZahl(raehmLaenge)} cm (LüA)
+            </text>
+            <text
+              x={midx} y={midy - 16} fontSize="9" fill={C_DIM} textAnchor="middle"
+              transform={`rotate(${textRot}, ${midx}, ${midy - 16})`}
+            >
+              Schmiege: 100 → {formatZahl(Math.abs(verstich))} cm
+            </text>
+          </g>
+        );
+      })()}
 
       {/* Maßkette Breite */}
       <line x1={sx(0)} x2={sx(breite)} y1={PAD.t + drawH + 22} y2={PAD.t + drawH + 22} stroke={C_DIM} strokeWidth="0.8" />
@@ -159,12 +213,14 @@ function WandSVG({
 // ── Stückliste ────────────────────────────────────────────────────────────────
 
 function StuecklisteTabelle({
-  stueckliste, ueberschreibungen, onUeberschreibungChange, onReset,
+  stueckliste, ueberschreibungen, onUeberschreibungChange, onReset, onRasterAbHier, pfostenabstandSoll,
 }: {
   stueckliste: Pfosten[];
   ueberschreibungen: Record<number, string>;
   onUeberschreibungChange: (index: number, wert: string) => void;
   onReset: (index: number) => void;
+  onRasterAbHier: (index: number) => void;
+  pfostenabstandSoll: number;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -174,7 +230,8 @@ function StuecklisteTabelle({
             <th className="py-1.5 pr-4 text-left font-semibold text-mu">Nr.</th>
             <th className="py-1.5 pr-4 text-right font-semibold text-mu">Position (cm)</th>
             <th className="py-1.5 pr-4 text-right font-semibold text-mu">Länge (cm)</th>
-            <th className="py-1.5 text-right font-semibold text-mu">Winkel (°)</th>
+            <th className="py-1.5 pr-4 text-right font-semibold text-mu">Winkel (°)</th>
+            <th className="py-1.5 text-right font-semibold text-mu"></th>
           </tr>
         </thead>
         <tbody>
@@ -203,7 +260,19 @@ function StuecklisteTabelle({
                 </div>
               </td>
               <td className="py-1.5 pr-4 text-right font-mono text-tx">{formatZahl(p.laenge)}</td>
-              <td className="py-1.5 text-right font-mono text-tx">{p.winkel.toFixed(2)}</td>
+              <td className="py-1.5 pr-4 text-right font-mono text-tx">{p.winkel.toFixed(2)}</td>
+              <td className="py-1.5 text-right">
+                {i < stueckliste.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onRasterAbHier(i)}
+                    title={`Ab diesem Pfosten alle folgenden im Raster von ${formatZahl(pfostenabstandSoll)} cm setzen`}
+                    className="text-mu hover:text-tx"
+                  >
+                    <ListRestart className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -221,6 +290,7 @@ export function WandplanerTool() {
   const [wandhoeheLinks, setWandhoeheLinks] = useState("250");
   const [wandhoeheRechts, setWandhoeheRechts] = useState("250");
   const [pfostenabstand, setPfostenabstand] = useState("62.5");
+  const [staenderbreite, setStaenderbreite] = useState("6");
   const [ueberschreibungen, setUeberschreibungen] = useState<Record<number, string>>({});
 
   const p = useMemo(() => ({
@@ -230,7 +300,8 @@ export function WandplanerTool() {
     wandhoeheLinks: parseFloat(wandhoeheLinks),
     wandhoeheRechts: parseFloat(wandhoeheRechts),
     pfostenabstandSoll: parseFloat(pfostenabstand),
-  }), [breite, schwellenhoehe, raehmhoehe, wandhoeheLinks, wandhoeheRechts, pfostenabstand]);
+    staenderbreite: parseFloat(staenderbreite),
+  }), [breite, schwellenhoehe, raehmhoehe, wandhoeheLinks, wandhoeheRechts, pfostenabstand, staenderbreite]);
 
   const fehler = useMemo((): string | null => {
     if (isNaN(p.breite) || p.breite <= 0) return "Wandbreite eingeben.";
@@ -239,6 +310,8 @@ export function WandplanerTool() {
     if (isNaN(p.wandhoeheLinks) || p.wandhoeheLinks <= 0) return "Wandhöhe links eingeben.";
     if (isNaN(p.wandhoeheRechts) || p.wandhoeheRechts <= 0) return "Wandhöhe rechts eingeben.";
     if (isNaN(p.pfostenabstandSoll) || p.pfostenabstandSoll <= 0) return "Pfostenabstand eingeben.";
+    if (isNaN(p.staenderbreite) || p.staenderbreite <= 0) return "Ständerbreite eingeben.";
+    if (p.staenderbreite >= p.breite / 2) return "Ständerbreite ist zu groß für die Wandbreite.";
     return null;
   }, [p]);
 
@@ -267,6 +340,24 @@ export function WandplanerTool() {
     });
   };
 
+  // Setzt, ausgehend vom Pfosten an `index`, alle folgenden Pfosten (außer
+  // dem letzten — der bleibt Restfeld/bündig zum Wandende) im Raster von
+  // pfostenabstandSoll. Ändert nicht die Anzahl der Pfosten.
+  const rasterAbHierSetzen = (index: number) => {
+    if (!erg) return;
+    const positionen = erg.positionen;
+    const letzterIndex = positionen.length - 1;
+    const anker = positionen[index];
+    setUeberschreibungen((prev) => {
+      const next = { ...prev };
+      for (let j = index + 1; j < letzterIndex; j++) {
+        next[j] = String(anker + (j - index) * p.pfostenabstandSoll);
+      }
+      delete next[letzterIndex];
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-5">
       <Card>
@@ -275,8 +366,9 @@ export function WandplanerTool() {
           <CardDescription>Alle Maße in cm — Seitenansicht (Elevation), Tiefe der Wand spielt keine Rolle</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Feld label="Breite" einheit="cm" wert={breite} onChange={(e) => setBreite(e.target.value)} min={10} />
+            <Feld label="Ständerbreite" einheit="cm" wert={staenderbreite} onChange={(e) => setStaenderbreite(e.target.value)} min={1} step={0.5} />
             <Feld label="Pfostenabstand (Soll)" einheit="cm" wert={pfostenabstand} onChange={(e) => setPfostenabstand(e.target.value)} min={1} step={0.5} />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -319,6 +411,10 @@ export function WandplanerTool() {
                 wandhoeheLinks={p.wandhoeheLinks}
                 wandhoeheRechts={p.wandhoeheRechts}
                 positionen={erg.positionen}
+                staenderbreite={p.staenderbreite}
+                winkel={erg.winkel}
+                raehmLaenge={erg.raehmLaenge}
+                verstich={erg.verstichmass}
               />
             </CardContent>
           </Card>
@@ -350,6 +446,8 @@ export function WandplanerTool() {
                 ueberschreibungen={ueberschreibungen}
                 onUeberschreibungChange={setUeberschreibung}
                 onReset={resetUeberschreibung}
+                onRasterAbHier={rasterAbHierSetzen}
+                pfostenabstandSoll={p.pfostenabstandSoll}
               />
             </CardContent>
           </Card>
